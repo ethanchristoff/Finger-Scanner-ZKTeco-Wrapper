@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Finger Scanner Data UI</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', Arial, sans-serif; margin: 0; background: #f7f9fa; color: #222; }
+        .container { max-width: 1200px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 32px 40px 40px 40px; }
+        .header-container { display: flex; align-items: center; margin-bottom: 32px; }
+        .header-container img { max-height: 60px; margin-right: 28px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+        h1 { font-size: 2.5rem; font-weight: 700; margin: 0; letter-spacing: 1px; color: #0a3d62; }
+        h2 { font-size: 1.5rem; color: #1e3799; margin-top: 40px; margin-bottom: 16px; }
+        form { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; }
+        label { font-weight: 500; color: #222; }
+        input[type="date"] { padding: 7px 12px; border: 1px solid #b2bec3; border-radius: 4px; font-size: 1rem; }
+        .btn { padding: 9px 22px; background: linear-gradient(90deg, #1e3799 0%, #38ada9 100%); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 1rem; transition: background 0.2s; text-decoration: none; }
+        .btn:hover { background: linear-gradient(90deg, #0a3d62 0%, #079992 100%); }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 30px; background: #f8fafc; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        th, td { border: 1px solid #d1d8e0; padding: 10px 8px; text-align: left; }
+        th { background-color: #f1f2f6; font-weight: 700; color: #222f3e; }
+        tr:nth-child(even) { background-color: #f6f6f6; }
+        tr:hover { background: #eaf6fb; }
+        .section { margin-bottom: 40px; }
+        .no-data { color: #b71540; font-style: italic; }
+        @media (max-width: 900px) {
+            .container { padding: 16px; }
+            .header-container { flex-direction: column; align-items: flex-start; }
+            h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <img src="{{ url_for('static', filename='FDE.png') }}" alt="Logo">
+            <h1>Finger Scanner Data Dashboard</h1>
+        </div>
+        <form method="get">
+            <label>Start Date: <input type="date" name="start_date" value="{{ start_date }}"></label>
+            <label>End Date: <input type="date" name="end_date" value="{{ end_date }}"></label>
+            <button class="btn" type="submit">Filter</button>
+            <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}" class="btn">Download XLSX</a>
+        </form>
+        <div class="section">
+            <h2>Attendance Summary</h2>
+            {% if summary %}
+            <div style="overflow-x:auto;">
+            <table>
+                <tr>{% for col in summary[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
+                {% for row in summary %}<tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+            </table>
+            </div>
+            {% else %}<p class="no-data">No summary data available.</p>{% endif %}
+        </div>
+        <div class="section">
+            <h2>Attendances</h2>
+            {% if attendences %}
+            <div style="overflow-x:auto;">
+            <table>
+                <tr>{% for col in attendences[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
+                {% for row in attendences %}<tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+            </table>
+            </div>
+            {% else %}<p class="no-data">No attendance data available.</p>{% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -6,6 +6,8 @@ import pandas as pd
 
 router = APIRouter()
 
+# Run this only for testing or troubleshooting purposes
+
 @router.get("/attendences")
 def attendences(
     start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
