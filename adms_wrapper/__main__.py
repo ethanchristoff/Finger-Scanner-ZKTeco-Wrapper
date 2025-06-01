@@ -55,8 +55,8 @@ def process_attendance_summary(attendences):
         .apply(lambda g: pd.Series({
             'start_time': g['timestamp'].min(),
             'end_time': g['timestamp'].max(),
-            'start_sn': get_device_for_time(g, 'timestamp', 'sn', 'min'),
-            'end_sn': get_device_for_time(g, 'timestamp', 'sn', 'max'),
+            'start_device_sn': get_device_for_time(g, 'timestamp', 'sn', 'min'),
+            'end_device_sn': get_device_for_time(g, 'timestamp', 'sn', 'max'),
         }))
         .reset_index()
     )
@@ -81,11 +81,22 @@ def export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_
             attendance_summary.to_excel(writer, sheet_name="AttendanceSummary", index=False)
 
 # --- Main Execution ---
-def main():
+def main(start_date: str = None, end_date: str = None):
     """
     Main function to orchestrate data fetching, processing, and exporting.
+    Optionally filters attendences by a date range.
     """
     attendences, device_logs, finger_logs, migration_logs, user_logs = fetch_all_data()
+    # Filter attendences by date range if provided
+    if start_date or end_date:
+        df = pd.DataFrame(attendences)
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            if start_date:
+                df = df[df['timestamp'] >= pd.to_datetime(start_date)]
+            if end_date:
+                df = df[df['timestamp'] <= pd.to_datetime(end_date)]
+            attendences = df.to_dict(orient="records")
     attendance_summary = process_attendance_summary(attendences)
     export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, attendance_summary)
     return ("Data exported to output.xlsx")
