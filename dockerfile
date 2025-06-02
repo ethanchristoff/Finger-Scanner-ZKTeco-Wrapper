@@ -1,5 +1,4 @@
-# Use official Python base image with uv (uvicorn + pip + wheel + build tools)
-FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:alpine
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -8,16 +7,16 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Create and activate a virtual environment, then sync dependencies
-RUN python -m venv /app/.venv \
-    && . /app/.venv/bin/activate \
-    && pip install --upgrade pip \
-    && pip install uv \
-    && if [ -f uv.lock ]; then uv sync; fi
+# Install system dependencies for MySQL client and build tools
+RUN apk add --no-cache build-base mariadb-connector-c-dev gcc
 
-# Set environment variable so uv uses the venv
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
+# Copy dependency files first for better caching
+COPY pyproject.toml* requirements.txt* uv.lock* ./
+
+# Install Python dependencies using uv
+RUN if [ -f uv.lock ]; then uv pip install --system --requirement uv.lock; \
+    elif [ -f pyproject.toml ]; then uv pip install --system --requirement pyproject.toml; \
+    elif [ -f requirements.txt ]; then uv pip install --system --requirement requirements.txt; fi
 
 # Copy project files
 COPY . /app/
@@ -25,5 +24,5 @@ COPY . /app/
 # Expose port 8080
 EXPOSE 8080
 
-# Run FastAPI app with uvicorn via uv
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+# Run Flask app using uv
+CMD ["uv", "pip", "run", "python", "app.py"]

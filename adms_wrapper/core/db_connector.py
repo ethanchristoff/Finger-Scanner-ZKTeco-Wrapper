@@ -1,11 +1,10 @@
 import mysql.connector
 from mysql.connector import Error
 
-# Update these with your actual MySQL credentials
 DB_CONFIG = {
     'host': 'localhost',
-    'user': 'root',  # change as needed
-    'password': '',  # change as needed
+    'user': 'root',  
+    'password': '',  
     'database': 'laravel',
 }
 
