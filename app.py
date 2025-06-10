@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, send_file, url_for
+from flask import Flask, render_template, request, send_file
 import pandas as pd
 from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
-from adms_wrapper.__main__ import process_attendance_summary, main
+from adms_wrapper.__main__ import process_attendance_summary
 import io
 import os
 
@@ -65,5 +65,5 @@ def download_xlsx():
     return send_file(output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
 
