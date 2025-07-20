@@ -2,8 +2,11 @@ from flask import Flask, render_template, request, send_file
 import pandas as pd
 from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
 from adms_wrapper.__main__ import process_attendance_summary
+
 import io
 import os
+from openpyxl.styles import PatternFill
+from openpyxl import load_workbook
 
 app = Flask(__name__)
 
@@ -61,8 +64,55 @@ def download_xlsx():
         pd.DataFrame(user_logs).to_excel(writer, sheet_name="Users", index=False)
         if summary_df is not None:
             summary_df.to_excel(writer, sheet_name="AttendanceSummary", index=False)
+
+        # --- Aggregate Sheet for Unique User Logins per Day ---
+        if summary_df is not None and not summary_df.empty:
+            agg = summary_df.copy()
+            agg['date'] = pd.to_datetime(agg['day'])
+            agg['date'] = agg['date'].dt.strftime('%Y-%m-%d')
+            agg_sheet = agg.groupby(['employee_id', 'date']).agg(
+                first_time=('start_time', 'first'),
+                last_time=('end_time', 'last')
+            ).reset_index()
+            def get_status(row):
+                if pd.isna(row['first_time']) and pd.isna(row['last_time']):
+                    return 'no activity'
+                elif pd.isna(row['first_time']):
+                    return 'missing check-in'
+                elif pd.isna(row['last_time']):
+                    return 'missing check-out'
+                else:
+                    return 'ok'
+            agg_sheet['status'] = agg_sheet.apply(get_status, axis=1)
+            agg_sheet.to_excel(writer, sheet_name="Aggregate", index=False)
     output.seek(0)
-    return send_file(output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    wb = load_workbook(output)
+    if 'Aggregate' in wb.sheetnames:
+        ws = wb['Aggregate']
+        status_col = None
+        for idx, cell in enumerate(ws[1], 1):
+            if cell.value == 'status':
+                status_col = idx
+                break
+        if status_col:
+            green = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+            yellow = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+            red = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            for row in ws.iter_rows(min_row=2, min_col=status_col, max_col=status_col):
+                cell = row[0]
+                if cell.value == 'ok':
+                    for c in ws[cell.row]:
+                        c.fill = green
+                elif cell.value == 'missing check-in' or cell.value == 'missing check-out':
+                    for c in ws[cell.row]:
+                        c.fill = yellow
+                elif cell.value == 'no activity':
+                    for c in ws[cell.row]:
+                        c.fill = red
+    new_output = io.BytesIO()
+    wb.save(new_output)
+    new_output.seek(0)
+    return send_file(new_output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
