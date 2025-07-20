@@ -1,0 +1,119 @@
+# ruff.toml for Python 3.12 FastAPI Project with Google Docstrings
+
+# --- Core Settings ---
+line-length = 200
+target-version = "py312"
+
+# Exclude common directories and build artifacts
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    ".serverless",
+    ".aws-sam",
+    "cdk.out",
+]
+
+# --- Formatter Configuration ---
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# --- Linter Settings ---
+[lint]
+select = ["ALL"]
+
+# Ignore rules that tend to be invasive or unnecessary for our FastAPI project:
+ignore = [
+    # Django-specific rules
+    "DJ",
+    # Executable/script-related checks
+    "EXE",
+    # Debugger imports (e.g., import pdb)
+    "T10",
+    # Security rules (can be noisy)
+    "S",
+    # Docstring requirements (relaxed for Google style)
+    "D100", "D101", "D102", "D103", "D104", "D107", "D41",
+    "D401",  # Allow non-imperative first lines
+    "D205",  # Relax blank line requirements between summary and description
+    "D212",  # Relax whitespace after opening quotes
+    # Allow non-top-level imports when necessary
+    "E402",
+    # Relax exception handling formatting; FastAPI will handle HTTP errors uniformly
+    "TRY", "TRY003",
+    # TODO formatting details (not required for our workflow)
+    "TD002", "TD003",
+    # Allow FIXME lines if present for temporary issues
+    "FIX002",
+    # Avoid extra variable assignment before `return`
+    "RET504",
+    # No need for overly specific noqa directives
+    "PGH004",
+    # Implicit namespace package is fine if intended
+    "INP001",
+    # Comma formatting handled by our formatter
+    "COM812",
+    # Additional type annotation and guideline rules
+    "ANN401",
+    "ANN204",
+    "ANN003","ANN002",
+    "G004",
+    "ERA001",
+    "EM1",
+    "PERF",
+    "D20",
+    "Q000",
+    "PTH",
+    "PLR0913",
+    "BLE001"
+]
+
+# Allow autofix for all enabled rules (when using --fix)
+fixable = ["ALL"]
+unfixable = []
+
+# --- Rule-Specific Configurations ---
+
+[lint.isort]
+# Ensure proper ordering of imports. Set your project's root package(s) here:
+known-first-party = ["app"]
+
+[lint.mccabe]
+# Set the maximum complexity threshold (C90 rules)
+max-complexity = 10
+
+[lint.pydocstyle]
+# Enforce Google-style docstrings
+convention = "google"
+
+# --- Per-File Ignores ---
+[lint.per-file-ignores]
+"__init__.py" = [
+    "F401",   # Allow unused imports in __init__.py for re-exporting
+    "D104",   # Allow missing docstrings in __init__.py
+]
+"tests/**/*.py" = [
+    "S101",   # Allow `assert` statements in test files
+    "D10",    # Relax docstring requirements in tests
+    "ANN",    # Allow missing type hints in tests
+]
