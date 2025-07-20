@@ -1,3 +1,4 @@
+
 from .db_connector import query_db
 
 def get_attendences() -> list:
@@ -19,3 +20,37 @@ def get_migrations() -> list:
 def get_users() -> list:
     """Get a list of all the registered users in the system"""
     return query_db("select * from users a ")
+
+# --- Device Serial Number to Branch Name Mapping ---
+
+def create_branch_mapping_table():
+    """Create the branch mapping table if it does not exist, with unique serial_number."""
+    query = '''
+    CREATE TABLE IF NOT EXISTS branch_mapping (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        serial_number VARCHAR(255) NOT NULL UNIQUE,
+        branch_name VARCHAR(255) NOT NULL
+    )
+    '''
+    query_db(query)
+
+def get_device_branch_mappings() -> list:
+    """Get all device serial number to branch name mappings."""
+    create_branch_mapping_table()
+    return query_db("SELECT serial_number, branch_name FROM branch_mapping")
+
+
+def add_device_branch_mapping(serial_number: str, branch_name: str):
+    """Add or update a device serial number to branch name mapping. Creates the table if it does not exist."""
+    create_branch_mapping_table()
+    query = '''
+    INSERT INTO branch_mapping (serial_number, branch_name)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE branch_name = VALUES(branch_name)
+    '''
+    return query_db(query, (serial_number, branch_name))
+    
+def delete_device_branch_mapping(serial_number: str):
+    """Delete a device serial number to branch name mapping."""
+    query = "DELETE FROM branch_mapping WHERE serial_number = %s"
+    return query_db(query, (serial_number,))

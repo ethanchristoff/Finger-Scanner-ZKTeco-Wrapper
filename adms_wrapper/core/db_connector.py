@@ -31,7 +31,16 @@ def query_db(query, params=None):
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(query, params or ())
-        results = cursor.fetchall()
+        # Commit changes for modifying queries
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        # Fetch results for select queries; others return empty list
+        try:
+            results = cursor.fetchall()
+        except Exception:
+            results = []
         return results
     except Error as e:
         print(f"Query failed: {e}")

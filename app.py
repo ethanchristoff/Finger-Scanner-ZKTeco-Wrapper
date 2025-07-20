@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, redirect, url_for, flash
 import pandas as pd
-from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
+from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users, get_device_branch_mappings, add_device_branch_mapping, delete_device_branch_mapping
 from adms_wrapper.__main__ import process_attendance_summary
 
 import io
@@ -9,6 +9,27 @@ from openpyxl.styles import PatternFill
 from openpyxl import load_workbook
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # Needed for flash messages
+@app.route("/device_branch_mapping", methods=["GET", "POST"])
+def device_branch_mapping():
+    if request.method == "POST":
+        # Handle deletion
+        delete_sn = request.form.get("delete_serial")
+        if delete_sn:
+            delete_device_branch_mapping(delete_sn)
+            flash(f"Mapping deleted: {delete_sn}", "success")
+            return redirect(url_for("device_branch_mapping"))
+        # Handle addition
+        serial_number = request.form.get("serial_number")
+        branch_name = request.form.get("branch_name")
+        if serial_number and branch_name:
+            add_device_branch_mapping(serial_number, branch_name)
+            flash(f"Mapping added: {serial_number} → {branch_name}", "success")
+        else:
+            flash("Both serial number and branch name are required.", "error")
+        return redirect(url_for("device_branch_mapping"))
+    mappings = get_device_branch_mappings() or []
+    return render_template("device_branch_mapping.html", mappings=mappings)
 
 # Ensure the static and templates folders exist
 if not os.path.exists("static"):
@@ -63,14 +84,45 @@ def download_xlsx():
         pd.DataFrame(migration_logs).to_excel(writer, sheet_name="Migrations", index=False)
         pd.DataFrame(user_logs).to_excel(writer, sheet_name="Users", index=False)
         if summary_df is not None:
-            summary_df.to_excel(writer, sheet_name="AttendanceSummary", index=False)
+            # Calculate weekly total work time per user and append as 'Total' row
+            df_sum = summary_df.copy()
+            # Convert time_spent string to timedelta
+            df_sum['time_spent_td'] = pd.to_timedelta(df_sum['time_spent'])
+            # Sum durations per employee
+            total_df = (
+                df_sum.groupby('employee_id')
+                .agg({'time_spent_td': 'sum'})
+                .reset_index()
+            )
+            # Format total time and assign 'Total' label for day
+            total_df['day'] = 'Total'
+            total_df['time_spent'] = total_df['time_spent_td'].apply(lambda x: str(x).split('.')[0])
+            # Clear other columns
+            for col in ['start_time', 'end_time', 'start_device_sn', 'end_device_sn']:
+                total_df[col] = ''
+            # Reorder columns to match summary_df
+            total_df = total_df[summary_df.columns]
+            # Combine original summary with totals
+            out_df = pd.concat([summary_df, total_df], ignore_index=True)
+            out_df.to_excel(writer, sheet_name="AttendanceSummary", index=False)
 
         # --- Aggregate Sheet for Unique User Logins per Day ---
         if summary_df is not None and not summary_df.empty:
             agg = summary_df.copy()
             agg['date'] = pd.to_datetime(agg['day'])
             agg['date'] = agg['date'].dt.strftime('%Y-%m-%d')
-            agg_sheet = agg.groupby(['employee_id', 'date']).agg(
+            # Prepare serial_number from summary and merge branch mappings
+            agg['serial_number'] = agg.get('start_device_sn', None)
+            mappings = get_device_branch_mappings() or []
+            mappings_df = pd.DataFrame(mappings)
+            if not mappings_df.empty:
+                agg = agg.merge(mappings_df, how='left', on='serial_number')
+            # Ensure branch_name column exists and fill missing
+            if 'branch_name' not in agg.columns:
+                agg['branch_name'] = ''
+            else:
+                agg['branch_name'] = agg['branch_name'].fillna('')
+            agg_sheet = agg.groupby(['employee_id', 'date', 'serial_number', 'branch_name']).agg(
                 first_time=('start_time', 'first'),
                 last_time=('end_time', 'last')
             ).reset_index()
@@ -87,6 +139,22 @@ def download_xlsx():
             agg_sheet.to_excel(writer, sheet_name="Aggregate", index=False)
     output.seek(0)
     wb = load_workbook(output)
+    # Highlight 'Total' rows in AttendanceSummary sheet in dark blue
+    if 'AttendanceSummary' in wb.sheetnames:
+        ws_sum = wb['AttendanceSummary']
+        # Find the 'day' column index
+        day_col = None
+        for idx, cell in enumerate(ws_sum[1], start=1):
+            if cell.value == 'day':
+                day_col = idx
+                break
+        if day_col:
+            blue_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+            # Iterate data rows
+            for row in ws_sum.iter_rows(min_row=2, max_row=ws_sum.max_row, min_col=1, max_col=ws_sum.max_column):
+                if row[day_col-1].value == 'Total':
+                    for cell in row:
+                        cell.fill = blue_fill
     if 'Aggregate' in wb.sheetnames:
         ws = wb['Aggregate']
         status_col = None
