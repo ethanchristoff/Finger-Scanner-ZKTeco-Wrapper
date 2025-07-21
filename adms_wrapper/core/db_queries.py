@@ -11,7 +11,7 @@ def get_device_logs() -> list:
 
 def get_finger_log() -> list:
     """Gets a log of all the available fingers that were logged into the system and when they were created"""
-    return query_db("select * from device_log a ")
+    return query_db("select * from finger_log a ")
 
 def get_migrations() -> list:
     """Get a list of all the migrations made to the SQL table"""
