@@ -7,12 +7,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'user': os.getenv('DB_USER', 'root'),  
-    'password': os.getenv('DB_PASSWORD', 'test123'),  
-    'database': os.getenv('DB_DATABASE', 'laravel'),
-    'port': int(os.getenv('DB_PORT', '3306')),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "test123"),
+    "database": os.getenv("DB_DATABASE", "laravel"),
+    "port": int(os.getenv("DB_PORT", "3306")),
 }
+
 
 def get_connection():
     """Create and return a new MySQL connection to the larvel database."""
@@ -22,6 +23,7 @@ def get_connection():
     except Error as e:
         print(f"Error connecting to MySQL: {e}")
         return None
+
 
 def query_db(query, params=None):
     """Execute a query and return the results as a list of dicts."""
@@ -50,10 +52,11 @@ def query_db(query, params=None):
             cursor.close()
             conn.close()
 
+
 def list_databases():
     """List all available databases on the MySQL server."""
     temp_config = DB_CONFIG.copy()
-    temp_config.pop('database', None)  
+    temp_config.pop("database", None)
 
     conn = None
     try:
@@ -70,4 +73,3 @@ def list_databases():
         if conn and conn.is_connected():
             cursor.close()
             conn.close()
-
