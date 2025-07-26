@@ -1,3 +1,41 @@
+# --- User Shift Mapping ---
+def create_user_shift_mapping_table():
+    """Create the user_shift_mapping table if it does not exist."""
+    query = """
+    CREATE TABLE IF NOT EXISTS user_shift_mapping (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        shift_name VARCHAR(255) NOT NULL,
+        shift_start TIME NOT NULL,
+        shift_end TIME NOT NULL
+    )
+    """
+    query_db(query)
+
+
+def get_user_shift_mappings() -> list:
+    """Get all user shift mappings."""
+    create_user_shift_mapping_table()
+    return query_db("SELECT user_id, shift_name, shift_start, shift_end FROM user_shift_mapping")
+
+
+def add_user_shift_mapping(user_id: str, shift_name: str, shift_start: str, shift_end: str):
+    """Add or update a user shift mapping."""
+    create_user_shift_mapping_table()
+    query = """
+    INSERT INTO user_shift_mapping (user_id, shift_name, shift_start, shift_end)
+    VALUES (%s, %s, %s, %s)
+    ON DUPLICATE KEY UPDATE shift_name=VALUES(shift_name), shift_start=VALUES(shift_start), shift_end=VALUES(shift_end)
+    """
+    return query_db(query, (user_id, shift_name, shift_start, shift_end))
+
+
+def delete_user_shift_mapping(user_id: str):
+    """Delete a user shift mapping."""
+    query = "DELETE FROM user_shift_mapping WHERE user_id = %s"
+    return query_db(query, (user_id,))
+
+
 from .db_connector import query_db
 
 

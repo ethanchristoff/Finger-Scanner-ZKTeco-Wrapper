@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from adms_wrapper.core.db_queries import get_device_branch_mappings
 
 
-def generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs):
+def generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings=None):
     summary_df = process_attendance_summary(attendences)
     if summary_df is not None and not summary_df.empty:
         mappings = get_device_branch_mappings() or []
@@ -20,15 +20,48 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
 
         summary_df["start_device_sn_branch"] = summary_df["start_device_sn"].apply(map_branch)
         summary_df["end_device_sn_branch"] = summary_df["end_device_sn"].apply(map_branch)
+
+        # --- Shift logic ---
+        shift_df = pd.DataFrame(shift_mappings) if shift_mappings else pd.DataFrame()
+
+        def get_shift_info(emp_id, day, start_time, end_time):
+            if shift_df.empty:
+                return "", "on time"
+            shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
+            if shift_row.empty:
+                return "", "no shift"
+            shift_name = shift_row.iloc[0]["shift_name"]
+            shift_start = shift_row.iloc[0]["shift_start"]
+            shift_end = shift_row.iloc[0]["shift_end"]
+            # Compare times
+            flag = "on time"
+            try:
+                if pd.notna(start_time) and str(start_time) != "":
+                    if str(start_time)[11:16] > str(shift_start):
+                        flag = "late in"
+                else:
+                    flag = "no check-in"
+                if pd.notna(end_time) and str(end_time) != "":
+                    if str(end_time)[11:16] < str(shift_end):
+                        flag = "early out"
+                else:
+                    flag = "no check-out"
+            except Exception:
+                pass
+            return shift_name, flag
+
+        summary_df["shift_name"] = ""
+        summary_df["shift_flag"] = ""
+        for idx, row in summary_df.iterrows():
+            shift_name, flag = get_shift_info(row["employee_id"], row["day"], row["start_time"], row["end_time"])
+            summary_df.at[idx, "shift_name"] = shift_name
+            summary_df.at[idx, "shift_flag"] = flag
+
         agg = summary_df.copy()
         agg["date"] = pd.to_datetime(agg["day"])
         agg["date"] = agg["date"].dt.strftime("%Y-%m-%d")
         agg["serial_number"] = agg.get("start_device_sn", None)
-        agg_sheet = (
-            agg.groupby(["employee_id", "date", "serial_number"])
-            .agg(first_time=("start_time", "first"), last_time=("end_time", "last"), subtotal_hours=("time_spent", lambda x: x.iloc[0] if len(x) > 0 else ""))
-            .reset_index()
-        )
+        agg_sheet = agg.groupby(["employee_id", "date", "serial_number"]).agg(first_time=("start_time", "first"), last_time=("end_time", "last")).reset_index()
 
         def get_status(row):
             if pd.isna(row["first_time"]) and pd.isna(row["last_time"]):
@@ -43,14 +76,14 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
         agg_sheet["status"] = agg_sheet.apply(get_status, axis=1)
         merged = pd.merge(
             summary_df,
-            agg_sheet[["employee_id", "date", "serial_number", "subtotal_hours", "status"]],
+            agg_sheet[["employee_id", "date", "serial_number", "status"]],
             left_on=["employee_id", summary_df["day"].astype(str), "start_device_sn"],
             right_on=["employee_id", "date", "serial_number"],
             how="left",
             suffixes=("", "_agg"),
         )
         merged = merged.drop(["date", "serial_number"], axis=1)
-        cols = list(summary_df.columns) + ["start_device_sn_branch", "end_device_sn_branch", "status"]
+        cols = list(summary_df.columns) + ["start_device_sn_branch", "end_device_sn_branch", "shift_name", "shift_flag", "status"]
         cols = [c for i, c in enumerate(cols) if c not in cols[:i]]
         merged = merged[cols]
         merged = merged.sort_values(by=["employee_id", "day"])
