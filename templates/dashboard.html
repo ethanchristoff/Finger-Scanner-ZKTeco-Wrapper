@@ -86,12 +86,24 @@
                     <td>{{ row.employee_id }}</td>
                     <td>{{ row.day }}</td>
                     <td>{{ row.start_time if row.start_time else '-' }}</td>
-                    <td>{{ row.end_time if row.end_time else '-' }}</td>
+                    <td>
+                        {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                            <span style="color: orange; font-weight: bold;" title="Auto-calculated end time (no sign-out)">{{ row.end_time }}</span>
+                        {% else %}
+                            {{ row.end_time if row.end_time else '-' }}
+                        {% endif %}
+                    </td>
                     <td>{{ row.start_device_sn if row.start_device_sn else '-' }}</td>
                     <td>{{ row.start_device_sn_branch if row.start_device_sn_branch else '-' }}</td>
                     <td>{{ row.end_device_sn if row.end_device_sn else '-' }}</td>
                     <td>{{ row.end_device_sn_branch if row.end_device_sn_branch else '-' }}</td>
-                    <td>{{ row.time_spent }}</td>
+                    <td>
+                        {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                            <span style="color: orange; font-weight: bold;" title="Calculated time until end of day">{{ row.time_spent }}</span>
+                        {% else %}
+                            {{ row.time_spent }}
+                        {% endif %}
+                    </td>
                     <td>{{ row.shift_name }}</td>
                     <td>{{ row.shift_start }}</td>
                     <td>{{ row.shift_end }}</td>

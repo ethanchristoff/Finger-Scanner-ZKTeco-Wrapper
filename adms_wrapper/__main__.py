@@ -1,4 +1,5 @@
 import pandas as pd
+
 from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
 
 
