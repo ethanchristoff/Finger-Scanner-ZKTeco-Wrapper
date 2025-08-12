@@ -111,7 +111,7 @@ def index():
         attendences = df.to_dict(orient="records")
 
     shift_mappings = get_user_shift_mappings() or []
-    
+
     # For dashboard: only show worked days (filter out absent days)
     summary_df = process_attendance_summary(attendences)
     if summary_df is not None:
@@ -120,7 +120,7 @@ def index():
         summary = dashboard_summary_df.to_dict(orient="records")
     else:
         summary = []
-        
+
     # Attach shift info to summary for dashboard sorting and ensure branch names are mapped
     shift_map = {str(s["user_id"]): s for s in shift_mappings}
     branch_mappings = get_device_branch_mappings() or []

@@ -40,7 +40,7 @@ def process_attendance_summary(attendences):
     - end_sn (device for last entry)
     - time_spent (duration between first and last entry, formatted as HH:MM:SS)
     - work_status (worked/absent)
-    
+
     This function now includes all working days (excluding Sundays) for each employee,
     showing both days they worked and days they were absent.
     """
@@ -65,46 +65,71 @@ def process_attendance_summary(attendences):
                     "end_time": g["timestamp"].max(),
                     "start_device_sn": get_device_for_time(g, "timestamp", "sn", "min"),
                     "end_device_sn": get_device_for_time(g, "timestamp", "sn", "max"),
-                    "work_status": "worked"
+                    "work_status": "worked",
+                    "num_entries": len(g),  # Count number of entries for the day
                 }
             )
         )
         .reset_index()
     )
-    
-    # Calculate time spent for worked days
-    worked_summary["time_spent"] = worked_summary["end_time"] - worked_summary["start_time"]
-    worked_summary["time_spent"] = worked_summary["time_spent"].apply(lambda x: str(x).split(".")[0])
-    
+
+    # Calculate time spent for worked days with improved logic for missing sign-outs
+    def calculate_time_spent(row):
+        start_time = row["start_time"]
+        end_time = row["end_time"]
+        num_entries = row["num_entries"]
+        day = row["day"]
+
+        # If only one entry (sign-in but no sign-out), calculate time until end of day
+        if num_entries == 1:
+            # Set end time to end of the same day (23:59:59)
+            end_of_day = pd.Timestamp.combine(day, pd.Timestamp("23:59:59").time())
+            time_diff = end_of_day - start_time
+        else:
+            # Normal case: calculate difference between start and end times
+            time_diff = end_time - start_time
+
+        return str(time_diff).split(".")[0]
+
+    worked_summary["time_spent"] = worked_summary.apply(calculate_time_spent, axis=1)
+
+    # Update end_time for single-entry days to reflect end of day
+    def update_end_time(row):
+        if row["num_entries"] == 1:
+            # Set end time to end of the same day for display purposes
+            return pd.Timestamp.combine(row["day"], pd.Timestamp("23:59:59").time())
+        return row["end_time"]
+
+    worked_summary["end_time"] = worked_summary.apply(update_end_time, axis=1)
+
+    # Drop the helper column
+    worked_summary = worked_summary.drop(columns=["num_entries"])
+
     # If no attendance data, return empty DataFrame
     if worked_summary.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", 
-                                   "start_device_sn", "end_device_sn", "time_spent", "work_status"])
-    
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status"])
+
     # Get all unique employees
     unique_employees = worked_summary["employee_id"].unique()
-    
+
     # Get date range from the data
     min_date = worked_summary["day"].min()
     max_date = worked_summary["day"].max()
-    
+
     # Generate all working days (excluding Sundays) in the date range
-    date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+    date_range = pd.date_range(start=min_date, end=max_date, freq="D")
     working_days = [d.date() for d in date_range if d.weekday() != 6]  # 6 = Sunday
-    
+
     # Create a complete attendance record for all employees and all working days
     complete_records = []
-    
+
     for employee_id in unique_employees:
         employee_worked_days = set(worked_summary[worked_summary["employee_id"] == employee_id]["day"])
-        
+
         for day in working_days:
             if day in employee_worked_days:
                 # Employee worked this day - get the actual record
-                work_record = worked_summary[
-                    (worked_summary["employee_id"] == employee_id) & 
-                    (worked_summary["day"] == day)
-                ].iloc[0].to_dict()
+                work_record = worked_summary[(worked_summary["employee_id"] == employee_id) & (worked_summary["day"] == day)].iloc[0].to_dict()
                 complete_records.append(work_record)
             else:
                 # Employee was absent this day - create absent record
@@ -116,16 +141,16 @@ def process_attendance_summary(attendences):
                     "start_device_sn": None,
                     "end_device_sn": None,
                     "time_spent": "0:00:00",
-                    "work_status": "absent"
+                    "work_status": "absent",
                 }
                 complete_records.append(absent_record)
-    
+
     # Create the final summary DataFrame
     summary = pd.DataFrame(complete_records)
-    
+
     # Sort by employee_id and day
     summary = summary.sort_values(["employee_id", "day"]).reset_index(drop=True)
-    
+
     return summary
 
 

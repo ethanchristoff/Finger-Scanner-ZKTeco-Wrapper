@@ -23,14 +23,8 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
             return ""
 
         # Only map branch names for worked days (where devices are available)
-        summary_df["start_device_sn_branch"] = summary_df.apply(
-            lambda row: map_branch(row["start_device_sn"]) if row["work_status"] == "worked" else "",
-            axis=1
-        )
-        summary_df["end_device_sn_branch"] = summary_df.apply(
-            lambda row: map_branch(row["end_device_sn"]) if row["work_status"] == "worked" else "",
-            axis=1
-        )
+        summary_df["start_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["start_device_sn"]) if row["work_status"] == "worked" else "", axis=1)
+        summary_df["end_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["end_device_sn"]) if row["work_status"] == "worked" else "", axis=1)
 
         # --- Shift logic ---
         shift_df = pd.DataFrame(shift_mappings) if shift_mappings else pd.DataFrame()
@@ -41,15 +35,15 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
             shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
             if shift_row.empty:
                 return "", "no shift"
-            
+
             shift_name = shift_row.iloc[0]["shift_name"]
             shift_start = shift_row.iloc[0]["shift_start"]
             shift_end = shift_row.iloc[0]["shift_end"]
-            
+
             # For absent days, just return shift info without time comparison
             if work_status == "absent":
                 return shift_name, "absent"
-            
+
             # Compare times for worked days
             flag = "on time"
             try:
@@ -82,7 +76,7 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
                 subtotal_str = str(subtotal).split(".")[0]
             else:
                 subtotal_str = "0:00:00"
-            
+
             subtotal_row = {col: "" for col in summary_df.columns}
             subtotal_row["employee_id"] = emp_id
             subtotal_row["day"] = "Subtotal"
