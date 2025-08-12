@@ -39,6 +39,10 @@ def process_attendance_summary(attendences):
     - start_sn (device for first entry)
     - end_sn (device for last entry)
     - time_spent (duration between first and last entry, formatted as HH:MM:SS)
+    - work_status (worked/absent)
+    
+    This function now includes all working days (excluding Sundays) for each employee,
+    showing both days they worked and days they were absent.
     """
     df_att = pd.DataFrame(attendences)
     required_cols = {"employee_id", "timestamp", "sn"}
@@ -51,8 +55,8 @@ def process_attendance_summary(attendences):
     # Extract date (day) from timestamp
     df_att["day"] = df_att["timestamp"].dt.date
 
-    # Group by employee_id and day to get start/end times and devices
-    summary = (
+    # Group by employee_id and day to get start/end times and devices for actual attendance
+    worked_summary = (
         df_att.groupby(["employee_id", "day"])
         .apply(
             lambda g: pd.Series(
@@ -61,15 +65,67 @@ def process_attendance_summary(attendences):
                     "end_time": g["timestamp"].max(),
                     "start_device_sn": get_device_for_time(g, "timestamp", "sn", "min"),
                     "end_device_sn": get_device_for_time(g, "timestamp", "sn", "max"),
+                    "work_status": "worked"
                 }
             )
         )
         .reset_index()
     )
-    # Calculate time spent as a timedelta
-    summary["time_spent"] = summary["end_time"] - summary["start_time"]
-    # Format time spent as HH:MM:SS
-    summary["time_spent"] = summary["time_spent"].apply(lambda x: str(x).split(".")[0])
+    
+    # Calculate time spent for worked days
+    worked_summary["time_spent"] = worked_summary["end_time"] - worked_summary["start_time"]
+    worked_summary["time_spent"] = worked_summary["time_spent"].apply(lambda x: str(x).split(".")[0])
+    
+    # If no attendance data, return empty DataFrame
+    if worked_summary.empty:
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", 
+                                   "start_device_sn", "end_device_sn", "time_spent", "work_status"])
+    
+    # Get all unique employees
+    unique_employees = worked_summary["employee_id"].unique()
+    
+    # Get date range from the data
+    min_date = worked_summary["day"].min()
+    max_date = worked_summary["day"].max()
+    
+    # Generate all working days (excluding Sundays) in the date range
+    date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+    working_days = [d.date() for d in date_range if d.weekday() != 6]  # 6 = Sunday
+    
+    # Create a complete attendance record for all employees and all working days
+    complete_records = []
+    
+    for employee_id in unique_employees:
+        employee_worked_days = set(worked_summary[worked_summary["employee_id"] == employee_id]["day"])
+        
+        for day in working_days:
+            if day in employee_worked_days:
+                # Employee worked this day - get the actual record
+                work_record = worked_summary[
+                    (worked_summary["employee_id"] == employee_id) & 
+                    (worked_summary["day"] == day)
+                ].iloc[0].to_dict()
+                complete_records.append(work_record)
+            else:
+                # Employee was absent this day - create absent record
+                absent_record = {
+                    "employee_id": employee_id,
+                    "day": day,
+                    "start_time": None,
+                    "end_time": None,
+                    "start_device_sn": None,
+                    "end_device_sn": None,
+                    "time_spent": "0:00:00",
+                    "work_status": "absent"
+                }
+                complete_records.append(absent_record)
+    
+    # Create the final summary DataFrame
+    summary = pd.DataFrame(complete_records)
+    
+    # Sort by employee_id and day
+    summary = summary.sort_values(["employee_id", "day"]).reset_index(drop=True)
+    
     return summary
 
 

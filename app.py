@@ -111,8 +111,16 @@ def index():
         attendences = df.to_dict(orient="records")
 
     shift_mappings = get_user_shift_mappings() or []
+    
+    # For dashboard: only show worked days (filter out absent days)
     summary_df = process_attendance_summary(attendences)
-    summary = summary_df.to_dict(orient="records") if summary_df is not None else []
+    if summary_df is not None:
+        # Filter to only show days when employees actually worked
+        dashboard_summary_df = summary_df[summary_df["work_status"] == "worked"].copy()
+        summary = dashboard_summary_df.to_dict(orient="records")
+    else:
+        summary = []
+        
     # Attach shift info to summary for dashboard sorting and ensure branch names are mapped
     shift_map = {str(s["user_id"]): s for s in shift_mappings}
     branch_mappings = get_device_branch_mappings() or []
@@ -127,11 +135,11 @@ def index():
             row["shift_name"] = ""
             row["shift_start"] = ""
             row["shift_end"] = ""
-        # Map start/end device branch names
+        # Map start/end device branch names (since we're only showing worked days, these should always have values)
         row["start_device_sn_branch"] = branch_map.get(str(row.get("start_device_sn")), "")
         row["end_device_sn_branch"] = branch_map.get(str(row.get("end_device_sn")), "")
     # Sort by shift_name if present
-    summary = sorted(summary, key=lambda x: (x.get("shift_name") or "", x.get("employee_id") or ""))
+    summary = sorted(summary, key=lambda x: (x.get("shift_name") or "", x.get("employee_id") or "", x.get("day") or ""))
 
     # Get unique employees and branches for filter dropdowns
     all_employees = list(set([str(a.get("employee_id", "")) for a in get_attendences() or [] if a.get("employee_id")]))

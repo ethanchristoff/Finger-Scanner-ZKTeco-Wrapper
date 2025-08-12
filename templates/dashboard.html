@@ -85,12 +85,12 @@
                 <tr>
                     <td>{{ row.employee_id }}</td>
                     <td>{{ row.day }}</td>
-                    <td>{{ row.start_time }}</td>
-                    <td>{{ row.end_time }}</td>
-                    <td>{{ row.start_device_sn }}</td>
-                    <td>{{ row.start_device_sn_branch }}</td>
-                    <td>{{ row.end_device_sn }}</td>
-                    <td>{{ row.end_device_sn_branch }}</td>
+                    <td>{{ row.start_time if row.start_time else '-' }}</td>
+                    <td>{{ row.end_time if row.end_time else '-' }}</td>
+                    <td>{{ row.start_device_sn if row.start_device_sn else '-' }}</td>
+                    <td>{{ row.start_device_sn_branch if row.start_device_sn_branch else '-' }}</td>
+                    <td>{{ row.end_device_sn if row.end_device_sn else '-' }}</td>
+                    <td>{{ row.end_device_sn_branch if row.end_device_sn_branch else '-' }}</td>
                     <td>{{ row.time_spent }}</td>
                     <td>{{ row.shift_name }}</td>
                     <td>{{ row.shift_start }}</td>
