@@ -1,23 +1,23 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for, flash
+import os
+
 import pandas as pd
+from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+
+from adms_wrapper.__main__ import process_attendance_summary
 from adms_wrapper.core.db_queries import (
+    add_device_branch_mapping,
+    add_user_shift_mapping,
+    delete_device_branch_mapping,
+    delete_user_shift_mapping,
     get_attendences,
+    get_device_branch_mappings,
     get_device_logs,
     get_finger_log,
     get_migrations,
-    get_users,
-    get_device_branch_mappings,
-    add_device_branch_mapping,
-    delete_device_branch_mapping,
     get_user_shift_mappings,
-    add_user_shift_mapping,
-    delete_user_shift_mapping,
+    get_users,
 )
-from adms_wrapper.__main__ import process_attendance_summary
 from adms_wrapper.core.excel_logic import generate_attendance_summary, write_excel
-
-import io
-import os
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"  # Needed for flash messages
