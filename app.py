@@ -6,12 +6,15 @@ from flask import Flask, flash, redirect, render_template, request, send_file, u
 from adms_wrapper.__main__ import process_attendance_summary
 from adms_wrapper.core.db_queries import (
     add_device_branch_mapping,
+    add_employee_designation_mapping,
     add_user_shift_mapping,
     delete_device_branch_mapping,
+    delete_employee_designation_mapping,
     delete_user_shift_mapping,
     get_attendences,
     get_device_branch_mappings,
     get_device_logs,
+    get_employee_designation_mappings,
     get_finger_log,
     get_migrations,
     get_user_shift_mappings,
@@ -70,6 +73,28 @@ def device_branch_mapping():
     return render_template("device_branch_mapping.html", mappings=mappings)
 
 
+@app.route("/employee_designation_mapping", methods=["GET", "POST"])
+def employee_designation_mapping():
+    if request.method == "POST":
+        # Handle deletion
+        delete_emp_id = request.form.get("delete_employee_id")
+        if delete_emp_id:
+            delete_employee_designation_mapping(delete_emp_id)
+            flash(f"Designation mapping deleted: {delete_emp_id}", "success")
+            return redirect(url_for("employee_designation_mapping"))
+        # Handle addition
+        employee_id = request.form.get("employee_id")
+        designation = request.form.get("designation")
+        if employee_id and designation:
+            add_employee_designation_mapping(employee_id, designation)
+            flash(f"Designation mapping added: {employee_id} → {designation}", "success")
+        else:
+            flash("Both employee ID and designation are required.", "error")
+        return redirect(url_for("employee_designation_mapping"))
+    mappings = get_employee_designation_mappings() or []
+    return render_template("employee_designation_mapping.html", mappings=mappings)
+
+
 # Ensure the static and templates folders exist
 if not os.path.exists("static"):
     os.makedirs("static")
@@ -125,7 +150,14 @@ def index():
     shift_map = {str(s["user_id"]): s for s in shift_mappings}
     branch_mappings = get_device_branch_mappings() or []
     branch_map = {str(b["serial_number"]): b["branch_name"] for b in branch_mappings}
+    designation_mappings = get_employee_designation_mappings() or []
+    designation_map = {str(d["employee_id"]): d["designation"] for d in designation_mappings}
+    
     for row in summary:
+        # Add designation
+        row["designation"] = designation_map.get(str(row.get("employee_id")), "")
+        
+        # Add shift info
         shift = shift_map.get(str(row.get("employee_id")))
         if shift:
             row["shift_name"] = shift.get("shift_name", "")
@@ -198,6 +230,7 @@ def download_xlsx():
     migration_logs = get_migrations() or []
     user_logs = get_users() or []
     shift_mappings = get_user_shift_mappings() or []
+    designation_mappings = get_employee_designation_mappings() or []
     merged = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings)
     new_output = write_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, merged)
     return send_file(new_output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

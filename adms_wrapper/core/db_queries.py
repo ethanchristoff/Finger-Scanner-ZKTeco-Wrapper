@@ -100,3 +100,41 @@ def delete_device_branch_mapping(serial_number: str):
     """Delete a device serial number to branch name mapping."""
     query = "DELETE FROM branch_mapping WHERE serial_number = %s"
     return query_db(query, (serial_number,))
+
+
+# --- Employee ID to Designation Mapping ---
+
+
+def create_employee_designation_mapping_table() -> None:
+    """Create the employee designation mapping table if it does not exist, with unique employee_id."""
+    query = """
+    CREATE TABLE IF NOT EXISTS employee_designation_mapping (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id VARCHAR(255) NOT NULL UNIQUE,
+        designation VARCHAR(255) NOT NULL
+    )
+    """
+    query_db(query)
+
+
+def get_employee_designation_mappings() -> list:
+    """Get all employee ID to designation mappings."""
+    create_employee_designation_mapping_table()
+    return query_db("SELECT employee_id, designation FROM employee_designation_mapping")
+
+
+def add_employee_designation_mapping(employee_id: str, designation: str) -> list:
+    """Add or update an employee ID to designation mapping. Creates the table if it does not exist."""
+    create_employee_designation_mapping_table()
+    query = """
+    INSERT INTO employee_designation_mapping (employee_id, designation)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE designation = VALUES(designation)
+    """
+    return query_db(query, (employee_id, designation))
+
+
+def delete_employee_designation_mapping(employee_id: str) -> list:
+    """Delete an employee ID to designation mapping."""
+    query = "DELETE FROM employee_designation_mapping WHERE employee_id = %s"
+    return query_db(query, (employee_id,))

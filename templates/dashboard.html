@@ -61,6 +61,7 @@
             <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}" class="btn">Download XLSX</a>
             <a href="/device_branch_mapping" class="btn" style="background: #f1c40f; color: #222; margin-left: 10px;">Device-Branch Mapping</a>
             <a href="/user_shift_mapping" class="btn" style="background: #8e44ad; color: #fff; margin-left: 10px;">User Shift Mapping</a>
+            <a href="/employee_designation_mapping" class="btn" style="background: #27ae60; color: #fff; margin-left: 10px;">Employee Designation Mapping</a>
         </form>
         <div class="section">
             <h2>Attendance Summary</h2>
@@ -69,6 +70,7 @@
             <table>
                 <tr>
                     <th>Employee ID</th>
+                    <th>Designation</th>
                     <th>Day</th>
                     <th>Start Time</th>
                     <th>End Time</th>
@@ -84,6 +86,7 @@
                 {% for row in summary %}
                 <tr>
                     <td>{{ row.employee_id }}</td>
+                    <td>{{ row.designation if row.designation else '-' }}</td>
                     <td>{{ row.day }}</td>
                     <td>{{ row.start_time if row.start_time else '-' }}</td>
                     <td>

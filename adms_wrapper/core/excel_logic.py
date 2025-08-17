@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 from adms_wrapper.__main__ import process_attendance_summary
-from adms_wrapper.core.db_queries import get_device_branch_mappings
+from adms_wrapper.core.db_queries import get_device_branch_mappings, get_employee_designation_mappings
 
 
 def generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings=None):
@@ -25,6 +25,20 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
         # Only map branch names for worked days (where devices are available)
         summary_df["start_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["start_device_sn"]) if row["work_status"] == "worked" else "", axis=1)
         summary_df["end_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["end_device_sn"]) if row["work_status"] == "worked" else "", axis=1)
+
+        # --- Designation mapping ---
+        designation_mappings = get_employee_designation_mappings() or []
+        designation_df = pd.DataFrame(designation_mappings)
+
+        def map_designation(emp_id):
+            if pd.isna(emp_id) or emp_id is None:
+                return ""
+            row = designation_df[designation_df["employee_id"] == str(emp_id)]
+            if not row.empty:
+                return row.iloc[0]["designation"]
+            return ""
+
+        summary_df["designation"] = summary_df["employee_id"].apply(map_designation)
 
         # --- Shift logic ---
         shift_df = pd.DataFrame(shift_mappings) if shift_mappings else pd.DataFrame()
@@ -79,6 +93,9 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
 
             subtotal_row = {col: "" for col in summary_df.columns}
             subtotal_row["employee_id"] = emp_id
+            # Get the designation from the first row of the group
+            if not group.empty:
+                subtotal_row["designation"] = group.iloc[0]["designation"]
             subtotal_row["day"] = "Subtotal"
             subtotal_row["time_spent"] = subtotal_str
             subtotal_row["work_status"] = "subtotal"
