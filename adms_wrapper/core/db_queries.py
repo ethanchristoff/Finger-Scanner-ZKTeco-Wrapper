@@ -36,6 +36,42 @@ def delete_user_shift_mapping(user_id: str):
     return query_db(query, (user_id,))
 
 
+# --- Employee to Branch Mapping ---
+def create_employee_branch_mapping_table():
+    """Create the employee_branch_mapping table if it does not exist."""
+    query = """
+    CREATE TABLE IF NOT EXISTS employee_branch_mapping (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id VARCHAR(255) NOT NULL UNIQUE,
+        branch_name VARCHAR(255) NOT NULL
+    )
+    """
+    query_db(query)
+
+
+def get_employee_branch_mappings() -> list:
+    """Get all employee branch mappings."""
+    create_employee_branch_mapping_table()
+    return query_db("SELECT employee_id, branch_name FROM employee_branch_mapping")
+
+
+def add_employee_branch_mapping(employee_id: str, branch_name: str):
+    """Add or update an employee branch mapping."""
+    create_employee_branch_mapping_table()
+    query = """
+    INSERT INTO employee_branch_mapping (employee_id, branch_name)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE branch_name=VALUES(branch_name)
+    """
+    return query_db(query, (employee_id, branch_name))
+
+
+def delete_employee_branch_mapping(employee_id: str):
+    """Delete an employee branch mapping."""
+    query = "DELETE FROM employee_branch_mapping WHERE employee_id = %s"
+    return query_db(query, (employee_id,))
+
+
 from .db_connector import query_db
 
 

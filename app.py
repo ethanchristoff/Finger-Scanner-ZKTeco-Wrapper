@@ -6,14 +6,17 @@ from flask import Flask, flash, redirect, render_template, request, send_file, u
 from adms_wrapper.__main__ import process_attendance_summary
 from adms_wrapper.core.db_queries import (
     add_device_branch_mapping,
+    add_employee_branch_mapping,
     add_employee_designation_mapping,
     add_user_shift_mapping,
     delete_device_branch_mapping,
+    delete_employee_branch_mapping,
     delete_employee_designation_mapping,
     delete_user_shift_mapping,
     get_attendences,
     get_device_branch_mappings,
     get_device_logs,
+    get_employee_branch_mappings,
     get_employee_designation_mappings,
     get_finger_log,
     get_migrations,
@@ -93,6 +96,29 @@ def employee_designation_mapping():
         return redirect(url_for("employee_designation_mapping"))
     mappings = get_employee_designation_mappings() or []
     return render_template("employee_designation_mapping.html", mappings=mappings)
+
+
+@app.route("/employee_branch_mapping", methods=["GET", "POST"])
+def employee_branch_mapping():
+    if request.method == "POST":
+        # Handle deletion
+        delete_emp_id = request.form.get("delete_employee_id")
+        if delete_emp_id:
+            delete_employee_branch_mapping(delete_emp_id)
+            flash(f"Branch mapping deleted: {delete_emp_id}", "success")
+            return redirect(url_for("employee_branch_mapping"))
+        # Handle addition
+        employee_id = request.form.get("employee_id")
+        branch_name = request.form.get("branch_name")
+        if employee_id and branch_name:
+            add_employee_branch_mapping(employee_id, branch_name)
+            flash(f"Branch mapping added: {employee_id} → {branch_name}", "success")
+        else:
+            flash("Both employee ID and branch name are required.", "error")
+        return redirect(url_for("employee_branch_mapping"))
+    mappings = get_employee_branch_mappings() or []
+    all_branches = list({b["branch_name"] for b in get_device_branch_mappings() or []})
+    return render_template("employee_branch_mapping.html", mappings=mappings, all_branches=all_branches)
 
 
 # Ensure the static and templates folders exist

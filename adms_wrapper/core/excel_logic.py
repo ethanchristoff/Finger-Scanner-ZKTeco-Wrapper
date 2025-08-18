@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 from adms_wrapper.__main__ import process_attendance_summary
-from adms_wrapper.core.db_queries import get_device_branch_mappings, get_employee_designation_mappings
+from adms_wrapper.core.db_queries import get_device_branch_mappings, get_employee_designation_mappings, get_employee_branch_mappings
 
 
 def generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings=None):
@@ -39,6 +39,20 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
             return ""
 
         summary_df["designation"] = summary_df["employee_id"].apply(map_designation)
+
+        # --- Employee branch mapping ---
+        employee_branch_mappings = get_employee_branch_mappings() or []
+        employee_branch_df = pd.DataFrame(employee_branch_mappings)
+
+        def map_employee_branch(emp_id):
+            if pd.isna(emp_id) or emp_id is None:
+                return ""
+            row = employee_branch_df[employee_branch_df["employee_id"] == str(emp_id)]
+            if not row.empty:
+                return row.iloc[0]["branch_name"]
+            return ""
+
+        summary_df["employee_branch"] = summary_df["employee_id"].apply(map_employee_branch)
 
         # --- Shift logic ---
         shift_df = pd.DataFrame(shift_mappings) if shift_mappings else pd.DataFrame()
