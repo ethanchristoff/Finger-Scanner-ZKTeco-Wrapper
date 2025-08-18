@@ -134,11 +134,12 @@ def index():
     end_date = request.args.get("end_date")
     employee_id = request.args.get("employee_id")
     branch_name = request.args.get("branch_name")
+    employee_branch = request.args.get("employee_branch")
 
     attendences = get_attendences() or []
 
     # Filter attendences by date if provided
-    if start_date or end_date or employee_id or branch_name:
+    if start_date or end_date or employee_id or branch_name or employee_branch:
         df = pd.DataFrame(attendences)
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -159,6 +160,14 @@ def index():
             if branch_serials:
                 df = df[df["sn"].isin(branch_serials)]
 
+        # Filter by employee branch
+        if employee_branch:
+            employee_branch_mappings = get_employee_branch_mappings() or []
+            # Get employee IDs that belong to the selected employee branch
+            branch_employees = [str(eb["employee_id"]) for eb in employee_branch_mappings if employee_branch.lower() in eb["branch_name"].lower()]
+            if branch_employees:
+                df = df[df["employee_id"].astype(str).isin(branch_employees)]
+
         attendences = df.to_dict(orient="records")
 
     shift_mappings = get_user_shift_mappings() or []
@@ -178,10 +187,15 @@ def index():
     branch_map = {str(b["serial_number"]): b["branch_name"] for b in branch_mappings}
     designation_mappings = get_employee_designation_mappings() or []
     designation_map = {str(d["employee_id"]): d["designation"] for d in designation_mappings}
+    employee_branch_mappings = get_employee_branch_mappings() or []
+    employee_branch_map = {str(eb["employee_id"]): eb["branch_name"] for eb in employee_branch_mappings}
     
     for row in summary:
         # Add designation
         row["designation"] = designation_map.get(str(row.get("employee_id")), "")
+        
+        # Add employee branch
+        row["employee_branch"] = employee_branch_map.get(str(row.get("employee_id")), "")
         
         # Add shift info
         shift = shift_map.get(str(row.get("employee_id")))
@@ -202,6 +216,7 @@ def index():
     # Get unique employees and branches for filter dropdowns
     all_employees = list(set([str(a.get("employee_id", "")) for a in get_attendences() or [] if a.get("employee_id")]))
     all_branches = list(set([b["branch_name"] for b in get_device_branch_mappings() or []]))
+    all_employee_branches = list(set([eb["branch_name"] for eb in get_employee_branch_mappings() or []]))
 
     return render_template(
         "dashboard.html",
@@ -211,8 +226,10 @@ def index():
         end_date=end_date or "",
         employee_id=employee_id or "",
         branch_name=branch_name or "",
+        employee_branch=employee_branch or "",
         all_employees=sorted(all_employees),
         all_branches=sorted(all_branches),
+        all_employee_branches=sorted(all_employee_branches),
         shift_mappings=shift_mappings,
     )
 
@@ -223,12 +240,13 @@ def download_xlsx():
     end_date = request.args.get("end_date")
     employee_id = request.args.get("employee_id")
     branch_name = request.args.get("branch_name")
+    employee_branch = request.args.get("employee_branch")
 
     # Use the same logic as the main function to filter and export
     attendences = get_attendences() or []
 
     # Apply the same filtering logic as in index()
-    if start_date or end_date or employee_id or branch_name:
+    if start_date or end_date or employee_id or branch_name or employee_branch:
         df = pd.DataFrame(attendences)
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -248,6 +266,14 @@ def download_xlsx():
             branch_serials = [b["serial_number"] for b in branch_mappings if branch_name.lower() in b["branch_name"].lower()]
             if branch_serials:
                 df = df[df["sn"].isin(branch_serials)]
+
+        # Filter by employee branch
+        if employee_branch:
+            employee_branch_mappings = get_employee_branch_mappings() or []
+            # Get employee IDs that belong to the selected employee branch
+            branch_employees = [str(eb["employee_id"]) for eb in employee_branch_mappings if employee_branch.lower() in eb["branch_name"].lower()]
+            if branch_employees:
+                df = df[df["employee_id"].astype(str).isin(branch_employees)]
 
         attendences = df.to_dict(orient="records")
 

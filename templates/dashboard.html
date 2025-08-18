@@ -57,8 +57,16 @@
                     {% endfor %}
                 </select>
             </label>
+            <label>Employee Branch: 
+                <select name="employee_branch">
+                    <option value="">All Employee Branches</option>
+                    {% for emp_branch in all_employee_branches %}
+                    <option value="{{ emp_branch }}" {% if emp_branch == employee_branch %}selected{% endif %}>{{ emp_branch }}</option>
+                    {% endfor %}
+                </select>
+            </label>
             <button class="btn" type="submit">Filter</button>
-            <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}" class="btn">Download XLSX</a>
+            <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}&employee_branch={{ employee_branch }}" class="btn">Download XLSX</a>
             <a href="/device_branch_mapping" class="btn" style="background: #f1c40f; color: #222; margin-left: 10px;">Device-Branch Mapping</a>
             <a href="/user_shift_mapping" class="btn" style="background: #8e44ad; color: #fff; margin-left: 10px;">User Shift Mapping</a>
             <a href="/employee_designation_mapping" class="btn" style="background: #27ae60; color: #fff; margin-left: 10px;">Employee Designation Mapping</a>
@@ -72,6 +80,7 @@
                 <tr>
                     <th>Employee ID</th>
                     <th>Designation</th>
+                    <th>Employee Branch</th>
                     <th>Day</th>
                     <th>Start Time</th>
                     <th>End Time</th>
@@ -88,6 +97,7 @@
                 <tr>
                     <td>{{ row.employee_id }}</td>
                     <td>{{ row.designation if row.designation else '-' }}</td>
+                    <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
                     <td>{{ row.day }}</td>
                     <td>{{ row.start_time if row.start_time else '-' }}</td>
                     <td>
