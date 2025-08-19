@@ -4,163 +4,429 @@
     <title>Finger Scanner Data UI</title>
     <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Roboto', Arial, sans-serif; margin: 0; background: #f7f9fa; color: #222; }
-        .container { max-width: 1200px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 32px 40px 40px 40px; }
-        .header-container { display: flex; align-items: center; margin-bottom: 32px; }
-        .header-container img { max-height: 60px; margin-right: 28px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
-        h1 { font-size: 2.5rem; font-weight: 700; margin: 0; letter-spacing: 1px; color: #0a3d62; }
-        h2 { font-size: 1.5rem; color: #1e3799; margin-top: 40px; margin-bottom: 16px; }
-        form { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; flex-wrap: wrap; }
-        label { font-weight: 500; color: #222; }
-        input[type="date"], select { padding: 7px 12px; border: 1px solid #b2bec3; border-radius: 4px; font-size: 1rem; }
-        select { background: white; }
-        .btn { padding: 9px 22px; background: linear-gradient(90deg, #1e3799 0%, #38ada9 100%); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 1rem; transition: background 0.2s; text-decoration: none; }
-        .btn:hover { background: linear-gradient(90deg, #0a3d62 0%, #079992 100%); }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 30px; background: #f8fafc; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-        th, td { border: 1px solid #d1d8e0; padding: 10px 8px; text-align: left; }
-        th { background-color: #f1f2f6; font-weight: 700; color: #222f3e; }
-        tr:nth-child(even) { background-color: #f6f6f6; }
-        tr:hover { background: #eaf6fb; }
-        .section { margin-bottom: 40px; }
-        .no-data { color: #b71540; font-style: italic; }
-        @media (max-width: 900px) {
-            .container { padding: 16px; }
-            .header-container { flex-direction: column; align-items: flex-start; }
-            h1 { font-size: 2rem; }
-            form { flex-direction: column; align-items: stretch; }
-            form label { margin-bottom: 10px; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0; 
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 20px auto; 
+            background: #2d3748; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+            overflow: hidden;
+            border: 1px solid #4a5568;
+        }
+        .header { 
+            background: linear-gradient(135deg, #1a202c 0%, #2c5282 100%);
+            color: #e2e8f0;
+            padding: 24px 32px;
+            text-align: center;
+            border-bottom: 1px solid #4a5568;
+        }
+        .header img { 
+            max-height: 48px; 
+            margin-bottom: 16px;
+            border-radius: 8px;
+        }
+        .header h1 { 
+            font-size: 2rem; 
+            font-weight: 600; 
+            margin: 0;
+            letter-spacing: -0.025em;
+            color: #f7fafc;
+        }
+        .content { padding: 32px; }
+        .filters {
+            background: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label { 
+            font-weight: 500; 
+            color: #cbd5e0; 
+            margin-bottom: 6px;
+            font-size: 0.875rem;
+        }
+        .form-group input, .form-group select { 
+            padding: 10px 12px; 
+            border: 2px solid #4a5568; 
+            border-radius: 8px; 
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            background: #2d3748;
+            color: #e2e8f0;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 500; 
+            font-size: 0.875rem; 
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { 
+            background: #3182ce; 
+            color: white; 
+        }
+        .btn-primary:hover { 
+            background: #2c5282; 
+            transform: translateY(-1px);
+        }
+        .btn-secondary { 
+            background: #4a5568; 
+            color: white; 
+        }
+        .btn-secondary:hover { 
+            background: #2d3748; 
+        }
+        .btn-success { 
+            background: #38a169; 
+            color: white; 
+        }
+        .btn-warning { 
+            background: #d69e2e; 
+            color: white; 
+        }
+        .btn-danger { 
+            background: #e53e3e; 
+            color: white; 
+        }
+        .legend {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .legend-title {
+            font-weight: 600;
+            color: #f7fafc;
+            margin-bottom: 12px;
+            font-size: 0.875rem;
+        }
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: #cbd5e0;
+        }
+        .legend-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.6875rem;
+        }
+        .badge-capped { background: #742a2a; color: #feb2b2; }
+        .badge-auto { background: #744210; color: #fbd38d; }
+        .badge-flagged { background: #2a4365; color: #90cdf4; }
+        .table-container {
+            background: #1a202c;
+            border-radius: 12px;
+            border: 1px solid #4a5568;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        th { 
+            background: #2d3748; 
+            font-weight: 600; 
+            color: #f7fafc; 
+            padding: 16px 12px;
+            border-bottom: 2px solid #4a5568;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        td { 
+            padding: 14px 12px; 
+            border-bottom: 1px solid #4a5568;
+            font-size: 0.875rem;
+            color: #e2e8f0;
+        }
+        tr:hover { 
+            background: #2d3748; 
+        }
+        .row-capped {
+            background: linear-gradient(135deg, #2d1b1b 0%, #742a2a 100%) !important;
+            border-left: 4px solid #f56565;
+        }
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        .status-normal { background: #276749; color: #9ae6b4; }
+        .status-capped { background: #742a2a; color: #feb2b2; }
+        .time-flagged { 
+            color: #fc8181; 
+            font-weight: 600;
+        }
+        .time-auto { 
+            color: #fbd38d; 
+            font-weight: 500;
+        }
+        .no-data { 
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+            font-style: italic;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f7fafc;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        @media (max-width: 768px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .filters-grid { grid-template-columns: 1fr; }
+            .actions { justify-content: center; }
+            .legend-items { justify-content: center; }
+            table { font-size: 0.75rem; }
+            th, td { padding: 10px 8px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-container">
+        <div class="header">
             <img src="{{ url_for('static', filename='FDE.png') }}" alt="Logo">
-            <h1>Finger Scanner Data Dashboard</h1>
+            <h1>Attendance Dashboard</h1>
         </div>
-        <form method="get">
-            <label>Start Date: <input type="date" name="start_date" value="{{ start_date }}"></label>
-            <label>End Date: <input type="date" name="end_date" value="{{ end_date }}"></label>
-            <label>Employee ID: 
-                <select name="employee_id">
-                    <option value="">All Employees</option>
-                    {% for emp in all_employees %}
-                    <option value="{{ emp }}" {% if emp == employee_id %}selected{% endif %}>{{ emp }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>Branch: 
-                <select name="branch_name">
-                    <option value="">All Branches</option>
-                    {% for branch in all_branches %}
-                    <option value="{{ branch }}" {% if branch == branch_name %}selected{% endif %}>{{ branch }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>Employee Branch: 
-                <select name="employee_branch">
-                    <option value="">All Employee Branches</option>
-                    {% for emp_branch in all_employee_branches %}
-                    <option value="{{ emp_branch }}" {% if emp_branch == employee_branch %}selected{% endif %}>{{ emp_branch }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button class="btn" type="submit">Filter</button>
-            <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}&employee_branch={{ employee_branch }}" class="btn">Download XLSX</a>
-            <a href="/device_branch_mapping" class="btn" style="background: #f1c40f; color: #222; margin-left: 10px;">Device-Branch Mapping</a>
-            <a href="/user_shift_mapping" class="btn" style="background: #8e44ad; color: #fff; margin-left: 10px;">User Shift Mapping</a>
-            <a href="/employee_designation_mapping" class="btn" style="background: #27ae60; color: #fff; margin-left: 10px;">Employee Designation Mapping</a>
-            <a href="/employee_branch_mapping" class="btn" style="background: #e74c3c; color: #fff; margin-left: 10px;">Employee Branch Mapping</a>
-        </form>
-        <div class="section">
-            <h2>Attendance Summary</h2>
-            <div style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
-                <strong>Legend:</strong>
-                <span style="display: inline-block; margin-left: 15px; padding: 2px 8px; background: #ffeb3b; border-radius: 3px; margin-right: 10px;">
-                    🟡 Shift Capped
-                </span>
-                <span style="color: orange; font-weight: bold; margin-right: 10px;">🟠 Auto End Time</span>
-                <span style="color: #ff5722; font-weight: bold;">⚠️ Work Hours Flagged</span>
-                <br>
-                <small style="color: #666; margin-top: 5px; display: block;">
-                    • Shift Capped: Work hours were limited by assigned shift schedule<br>
-                    • Auto End Time: Employee didn't sign out, time calculated until end of day<br>
-                    • Work Hours Flagged: Time calculation was modified due to shift constraints
-                </small>
+        
+        <div class="content">
+            <div class="filters">
+                <form method="get">
+                    <div class="filters-grid">
+                        <div class="form-group">
+                            <label>Start Date</label>
+                            <input type="date" name="start_date" value="{{ start_date }}">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date</label>
+                            <input type="date" name="end_date" value="{{ end_date }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Employee ID</label>
+                            <select name="employee_id">
+                                <option value="">All Employees</option>
+                                {% for emp in all_employees %}
+                                <option value="{{ emp }}" {% if emp == employee_id %}selected{% endif %}>{{ emp }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Device Branch</label>
+                            <select name="branch_name">
+                                <option value="">All Branches</option>
+                                {% for branch in all_branches %}
+                                <option value="{{ branch }}" {% if branch == branch_name %}selected{% endif %}>{{ branch }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Employee Branch</label>
+                            <select name="employee_branch">
+                                <option value="">All Employee Branches</option>
+                                {% for emp_branch in all_employee_branches %}
+                                <option value="{{ emp_branch }}" {% if emp_branch == employee_branch %}selected{% endif %}>{{ emp_branch }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" type="submit">
+                            <span>🔍</span> Filter Data
+                        </button>
+                        <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}&employee_branch={{ employee_branch }}" class="btn btn-success">
+                            <span>📊</span> Download Excel
+                        </a>
+                        <a href="/device_branch_mapping" class="btn btn-secondary">
+                            <span>🔗</span> Device Mapping
+                        </a>
+                        <a href="/user_shift_mapping" class="btn btn-warning">
+                            <span>⏰</span> Shift Mapping
+                        </a>
+                        <a href="/employee_designation_mapping" class="btn btn-secondary">
+                            <span>👤</span> Designations
+                        </a>
+                        <a href="/employee_branch_mapping" class="btn btn-danger">
+                            <span>🏢</span> Branches
+                        </a>
+                    </div>
+                </form>
             </div>
+            <div class="legend">
+                <div class="legend-title">📋 Status Legend</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <span class="legend-badge badge-capped">SHIFT CAPPED</span>
+                        <span>Work hours limited by shift schedule</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-badge badge-auto">AUTO END</span>
+                        <span>No sign-out recorded</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-badge badge-flagged">MODIFIED</span>
+                        <span>Time calculation adjusted</span>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">
+                <span>📊</span> Attendance Summary
+            </h2>
             {% if summary %}
-            <div style="overflow-x:auto;">
-            <table>
-                <tr>
-                    <th>Employee ID</th>
-                    <th>Designation</th>
-                    <th>Employee Branch</th>
-                    <th>Day</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Start Device SN</th>
-                    <th>Start Device Branch</th>
-                    <th>End Device SN</th>
-                    <th>End Device Branch</th>
-                    <th>Time Spent</th>
-                    <th>Shift Name</th>
-                    <th>Shift Start</th>
-                    <th>Shift End</th>
-                    <th>Shift Status</th>
-                </tr>
-                {% for row in summary %}
-                <tr {% if row.shift_capped %}style="background-color: #ffeb3b !important;" title="Work hours capped by shift schedule"{% endif %}>
-                    <td>{{ row.employee_id }}</td>
-                    <td>{{ row.designation if row.designation else '-' }}</td>
-                    <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
-                    <td>{{ row.day }}</td>
-                    <td>{{ row.start_time if row.start_time else '-' }}</td>
-                    <td>
-                        {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
-                            <span style="color: orange; font-weight: bold;" title="Auto-calculated end time (no sign-out)">{{ row.end_time }}</span>
-                        {% else %}
-                            {{ row.end_time if row.end_time else '-' }}
-                        {% endif %}
-                    </td>
-                    <td>{{ row.start_device_sn if row.start_device_sn else '-' }}</td>
-                    <td>{{ row.start_device_sn_branch if row.start_device_sn_branch else '-' }}</td>
-                    <td>{{ row.end_device_sn if row.end_device_sn else '-' }}</td>
-                    <td>{{ row.end_device_sn_branch if row.end_device_sn_branch else '-' }}</td>
-                    <td>
-                        {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
-                            <span style="color: orange; font-weight: bold;" title="Calculated time until end of day">{{ row.time_spent }}</span>
-                        {% elif row.shift_capped %}
-                            <span style="color: #ff5722; font-weight: bold;" title="Work hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
-                        {% else %}
-                            {{ row.time_spent }}
-                        {% endif %}
-                    </td>
-                    <td>{{ row.shift_name }}</td>
-                    <td>{{ row.shift_start }}</td>
-                    <td>{{ row.shift_end }}</td>
-                    <td>
-                        {% if row.shift_capped %}
-                            <span style="color: #ff5722; font-weight: bold;">SHIFT CAPPED</span>
-                        {% else %}
-                            Normal
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Designation</th>
+                            <th>Branch</th>
+                            <th>Date</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Hours Worked</th>
+                            <th>Shift</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in summary %}
+                        <tr {% if row.shift_capped %}class="row-capped"{% endif %}>
+                            <td><strong>{{ row.employee_id }}</strong></td>
+                            <td>{{ row.designation if row.designation else '-' }}</td>
+                            <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
+                            <td>{{ row.day }}</td>
+                            <td>{{ row.start_time.strftime('%H:%M') if row.start_time else '-' }}</td>
+                            <td>
+                                {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                                    <span class="time-auto" title="Auto-calculated end time">{{ row.end_time.strftime('%H:%M') }} ⏰</span>
+                                {% else %}
+                                    {{ row.end_time.strftime('%H:%M') if row.end_time else '-' }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.shift_capped %}
+                                    <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
+                                {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                                    <span class="time-auto" title="Calculated until end of day">{{ row.time_spent }}</span>
+                                {% else %}
+                                    {{ row.time_spent }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.shift_name %}
+                                    <strong>{{ row.shift_name }}</strong><br>
+                                    <small>{{ row.shift_start }} - {{ row.shift_end }}</small>
+                                {% else %}
+                                    <small style="color: #a0aec0;">No shift assigned</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.shift_capped %}
+                                    <span class="status-badge status-capped">SHIFT CAPPED</span>
+                                {% else %}
+                                    <span class="status-badge status-normal">NORMAL</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            {% else %}<p class="no-data">No summary data available.</p>{% endif %}
-        </div>
-        <div class="section">
-            <h2>Attendances</h2>
+            {% else %}
+                <div class="no-data">
+                    <span>📋</span> No attendance data available for the selected filters.
+                </div>
+            {% endif %}
+
+            <div style="margin: 48px 0 32px 0;">
+                <h2 class="section-title">
+                    <span>📝</span> Raw Attendance Records
+                </h2>
+                <div style="margin-bottom: 12px; font-size: 0.875rem; color: #6b7280;">
+                    Complete log of all fingerprint scanner entries and exits
+                </div>
+            </div>
             {% if attendences %}
-            <div style="overflow-x:auto;">
-            <table>
-                <tr>{% for col in attendences[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
-                {% for row in attendences %}<tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            {% for col in attendences[0].keys() %}
+                            <th>{{ col|title }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in attendences %}
+                        <tr>
+                            {% for value in row.values() %}
+                            <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            {% else %}<p class="no-data">No attendance data available.</p>{% endif %}
+            {% else %}
+                <div class="no-data">
+                    <span>📝</span> No raw attendance records available for the selected filters.
+                </div>
+            {% endif %}
         </div>
     </div>
 </body>
