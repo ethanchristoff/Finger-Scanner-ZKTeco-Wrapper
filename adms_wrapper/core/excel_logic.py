@@ -57,7 +57,7 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
         # --- Shift logic ---
         shift_df = pd.DataFrame(shift_mappings) if shift_mappings else pd.DataFrame()
 
-        def get_shift_info(emp_id, work_status, start_time, end_time):
+        def get_shift_info(emp_id, work_status, start_time, end_time, shift_capped=False):
             if shift_df.empty:
                 return "", "no shift"
             shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
@@ -71,6 +71,10 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
             # For absent days, just return shift info without time comparison
             if work_status == "absent":
                 return shift_name, "absent"
+
+            # Check if work hours were capped due to shift constraints
+            if shift_capped:
+                return shift_name, "shift_capped"
 
             # Compare times for worked days
             flag = "on time"
@@ -88,7 +92,8 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
         summary_df["shift_name"] = ""
         summary_df["shift_flag"] = ""
         for idx, row in summary_df.iterrows():
-            shift_name, flag = get_shift_info(row["employee_id"], row["work_status"], row["start_time"], row["end_time"])
+            shift_capped = row.get("shift_capped", False)
+            shift_name, flag = get_shift_info(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_capped)
             summary_df.at[idx, "shift_name"] = shift_name
             summary_df.at[idx, "shift_flag"] = flag
 
@@ -136,21 +141,31 @@ def write_excel(attendences, device_logs, finger_logs, migration_logs, user_logs
         ws_sum = wb["AttendanceSummary"]
         day_col = None
         work_status_col = None
+        shift_capped_col = None
         for idx, cell in enumerate(ws_sum[1], start=1):
             if cell.value == "day":
                 day_col = idx
             if cell.value == "work_status":
                 work_status_col = idx
+            if cell.value == "shift_capped":
+                shift_capped_col = idx
         blue_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        yellow_fill = PatternFill(start_color="FFEB3B", end_color="FFEB3B", fill_type="solid")  # For shift_capped
         for row in ws_sum.iter_rows(min_row=2, max_row=ws_sum.max_row, min_col=1, max_col=ws_sum.max_column):
             if day_col and row[day_col - 1].value == "Subtotal":
                 for cell in row:
                     cell.fill = blue_fill
             elif work_status_col:
                 work_status = row[work_status_col - 1].value
-                if work_status == "worked":
+                shift_capped = row[shift_capped_col - 1].value if shift_capped_col else False
+                
+                if shift_capped:
+                    # Priority for shift_capped highlighting
+                    for cell in row:
+                        cell.fill = yellow_fill
+                elif work_status == "worked":
                     for cell in row:
                         cell.fill = green_fill
                 elif work_status == "absent":

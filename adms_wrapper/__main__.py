@@ -1,6 +1,6 @@
 import pandas as pd
 
-from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
+from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users, get_user_shift_mappings
 
 
 # --- Data Extraction Functions ---
@@ -41,15 +41,31 @@ def process_attendance_summary(attendences):
     - end_sn (device for last entry)
     - time_spent (duration between first and last entry, formatted as HH:MM:SS)
     - work_status (worked/absent)
+    - shift_capped (whether the work hours were capped by shift limits)
 
     This function now includes all working days (excluding Sundays) for each employee,
     showing both days they worked and days they were absent.
+    For employees with shifts, work hours are capped to their shift duration when they exceed it.
     """
     df_att = pd.DataFrame(attendences)
     required_cols = {"employee_id", "timestamp", "sn"}
     if not required_cols.issubset(df_att.columns):
         print("Could not find 'employee_id', 'timestamp', or 'sn' columns in attendences data.")
         return None
+
+    # Get shift mappings
+    shift_mappings = get_user_shift_mappings() or []
+    shift_df = pd.DataFrame(shift_mappings)
+    
+    # Create a dictionary for easy lookup of shift times
+    shift_dict = {}
+    if not shift_df.empty:
+        for _, shift in shift_df.iterrows():
+            shift_dict[str(shift['user_id'])] = {
+                'shift_start': shift['shift_start'],
+                'shift_end': shift['shift_end'],
+                'shift_name': shift['shift_name']
+            }
 
     # Convert timestamp to datetime for accurate calculations
     df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
@@ -74,41 +90,62 @@ def process_attendance_summary(attendences):
         .reset_index()
     )
 
-    # Calculate time spent for worked days with improved logic for missing sign-outs
-    def calculate_time_spent(row):
+    # Calculate time spent for worked days with improved logic for missing sign-outs and shift-based capping
+    def calculate_time_spent_and_flag(row):
         start_time = row["start_time"]
         end_time = row["end_time"]
         num_entries = row["num_entries"]
         day = row["day"]
-
+        employee_id = str(row["employee_id"])
+        
+        # Check if employee has a shift
+        has_shift = employee_id in shift_dict
+        shift_capped = False
+        
         # If only one entry (sign-in but no sign-out), calculate time until end of day
         if num_entries == 1:
             # Set end time to end of the same day (23:59:59)
             end_of_day = pd.Timestamp.combine(day, pd.Timestamp("23:59:59").time())
-            time_diff = end_of_day - start_time
-        else:
-            # Normal case: calculate difference between start and end times
-            time_diff = end_time - start_time
+            end_time = end_of_day
+        
+        # Apply shift capping logic if employee has a shift
+        if has_shift:
+            shift_info = shift_dict[employee_id]
+            shift_end_time = shift_info['shift_end']
+            
+            # Convert shift_end_time to time object if it's a Timedelta
+            if isinstance(shift_end_time, pd.Timedelta):
+                # Convert to total seconds and then to time
+                total_seconds = int(shift_end_time.total_seconds())
+                hours, remainder = divmod(total_seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                shift_end_time = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
+            
+            # Convert shift times to datetime on the same day
+            shift_end_datetime = pd.Timestamp.combine(day, shift_end_time)
+            
+            # If employee worked beyond their shift end time, cap it to shift end
+            if end_time > shift_end_datetime:
+                end_time = shift_end_datetime
+                shift_capped = True
+        
+        # Calculate time difference
+        time_diff = end_time - start_time
+        
+        return str(time_diff).split(".")[0], shift_capped, end_time
 
-        return str(time_diff).split(".")[0]
-
-    worked_summary["time_spent"] = worked_summary.apply(calculate_time_spent, axis=1)
-
-    # Update end_time for single-entry days to reflect end of day
-    def update_end_time(row):
-        if row["num_entries"] == 1:
-            # Set end time to end of the same day for display purposes
-            return pd.Timestamp.combine(row["day"], pd.Timestamp("23:59:59").time())
-        return row["end_time"]
-
-    worked_summary["end_time"] = worked_summary.apply(update_end_time, axis=1)
+    # Apply the function and extract results
+    time_results = worked_summary.apply(calculate_time_spent_and_flag, axis=1, result_type='expand')
+    worked_summary["time_spent"] = time_results[0]
+    worked_summary["shift_capped"] = time_results[1]
+    worked_summary["end_time"] = time_results[2]
 
     # Drop the helper column
     worked_summary = worked_summary.drop(columns=["num_entries"])
 
     # If no attendance data, return empty DataFrame
     if worked_summary.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status"])
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
 
     # Get all unique employees
     unique_employees = worked_summary["employee_id"].unique()
@@ -143,6 +180,7 @@ def process_attendance_summary(attendences):
                     "end_device_sn": None,
                     "time_spent": "0:00:00",
                     "work_status": "absent",
+                    "shift_capped": False,
                 }
                 complete_records.append(absent_record)
 
