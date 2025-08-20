@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import timedelta
 
 from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users, get_user_shift_mappings
 
@@ -69,12 +70,55 @@ def process_attendance_summary(attendences):
 
     # Convert timestamp to datetime for accurate calculations
     df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
-    # Extract date (day) from timestamp
-    df_att["day"] = df_att["timestamp"].dt.date
-
+    
+    # Process attendance entries with late checkout logic
+    processed_entries = []
+    
+    for employee_id in df_att["employee_id"].unique():
+        employee_data = df_att[df_att["employee_id"] == employee_id].sort_values("timestamp")
+        
+        for _, entry in employee_data.iterrows():
+            timestamp = entry["timestamp"]
+            day = timestamp.date()
+            time_of_day = timestamp.time()
+            
+            # Check if this is a late checkout (after shift end but before noon)
+            if str(employee_id) in shift_dict:
+                shift_info = shift_dict[str(employee_id)]
+                shift_end = shift_info['shift_end']
+                
+                # Convert shift_end to time object if it's a Timedelta
+                if isinstance(shift_end, pd.Timedelta):
+                    total_seconds = int(shift_end.total_seconds())
+                    hours, remainder = divmod(total_seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    shift_end = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
+                
+                # If checkout is after shift end but before noon next day, assign to previous day
+                if time_of_day > shift_end and timestamp.hour < 12:
+                    # Check if this could be a late checkout from previous day
+                    previous_day = timestamp.date() - timedelta(days=1)
+                    
+                    # Look for entries from the previous day for this employee
+                    prev_day_entries = employee_data[employee_data["timestamp"].dt.date == previous_day]
+                    
+                    if not prev_day_entries.empty:
+                        # This is likely a late checkout, assign to previous day
+                        day = previous_day
+            
+            processed_entries.append({
+                "employee_id": entry["employee_id"],
+                "timestamp": entry["timestamp"],
+                "sn": entry["sn"],
+                "day": day
+            })
+    
+    # Create DataFrame from processed entries
+    df_processed = pd.DataFrame(processed_entries)
+    
     # Group by employee_id and day to get start/end times and devices for actual attendance
     worked_summary = (
-        df_att.groupby(["employee_id", "day"])
+        df_processed.groupby(["employee_id", "day"])
         .apply(
             lambda g: pd.Series(
                 {
@@ -124,10 +168,14 @@ def process_attendance_summary(attendences):
             # Convert shift times to datetime on the same day
             shift_end_datetime = pd.Timestamp.combine(day, shift_end_time)
             
-            # If employee worked beyond their shift end time, cap it to shift end
+            # Check if this is a late checkout scenario (after shift end but before noon)
             if end_time > shift_end_datetime:
-                end_time = shift_end_datetime
-                shift_capped = True
+                if end_time.hour >= 12:  # If checkout is after noon, don't cap - it's next day cycle
+                    pass  # Keep original end_time
+                else:
+                    # This is a late checkout - don't cap, but mark it appropriately
+                    # The timer should NOT be reset here, keep the actual worked time
+                    pass  # Keep original end_time, don't cap
         
         # Calculate time difference
         time_diff = end_time - start_time

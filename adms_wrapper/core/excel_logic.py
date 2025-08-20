@@ -83,7 +83,16 @@ def generate_attendance_summary(attendences, device_logs, finger_logs, migration
                     if str(start_time)[11:16] > str(shift_start):
                         flag = "late in"
                 if pd.notna(end_time) and str(end_time) != "":
-                    if str(end_time)[11:16] < str(shift_end):
+                    # Check for late checkout scenario
+                    end_time_hour = end_time.hour if hasattr(end_time, 'hour') else int(str(end_time)[11:13])
+                    end_time_str = str(end_time)[11:16]
+                    
+                    # If checkout is after shift end but before noon, mark as late checkout
+                    if end_time_str > str(shift_end):
+                        if end_time_hour < 12:
+                            flag = "late checkout"
+                        # If after noon, it's considered next day cycle, so normal checkout
+                    elif end_time_str < str(shift_end):
                         flag = "early out"
             except Exception:
                 pass

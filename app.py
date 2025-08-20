@@ -175,38 +175,28 @@ def index():
     # For dashboard: only show worked days (filter out absent days)
     summary_df = process_attendance_summary(attendences)
     if summary_df is not None:
-        # Filter to only show days when employees actually worked
-        dashboard_summary_df = summary_df[summary_df["work_status"] == "worked"].copy()
+        # Use generate_attendance_summary to get shift flags and other info
+        device_logs = get_device_logs() or []
+        finger_logs = get_finger_log() or []
+        migration_logs = get_migrations() or []
+        user_logs = get_users() or []
+        
+        full_summary_df = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings)
+        
+        # Filter to only show days when employees actually worked (exclude absent and subtotal rows)
+        dashboard_summary_df = full_summary_df[
+            (full_summary_df["work_status"] == "worked") & 
+            (full_summary_df["day"] != "Subtotal")
+        ].copy()
         summary = dashboard_summary_df.to_dict(orient="records")
     else:
         summary = []
 
-    # Attach shift info to summary for dashboard sorting and ensure branch names are mapped
-    shift_map = {str(s["user_id"]): s for s in shift_mappings}
+    # Attach branch info to summary for dashboard
     branch_mappings = get_device_branch_mappings() or []
     branch_map = {str(b["serial_number"]): b["branch_name"] for b in branch_mappings}
-    designation_mappings = get_employee_designation_mappings() or []
-    designation_map = {str(d["employee_id"]): d["designation"] for d in designation_mappings}
-    employee_branch_mappings = get_employee_branch_mappings() or []
-    employee_branch_map = {str(eb["employee_id"]): eb["branch_name"] for eb in employee_branch_mappings}
     
     for row in summary:
-        # Add designation
-        row["designation"] = designation_map.get(str(row.get("employee_id")), "")
-        
-        # Add employee branch
-        row["employee_branch"] = employee_branch_map.get(str(row.get("employee_id")), "")
-        
-        # Add shift info
-        shift = shift_map.get(str(row.get("employee_id")))
-        if shift:
-            row["shift_name"] = shift.get("shift_name", "")
-            row["shift_start"] = shift.get("shift_start", "")
-            row["shift_end"] = shift.get("shift_end", "")
-        else:
-            row["shift_name"] = ""
-            row["shift_start"] = ""
-            row["shift_end"] = ""
         # Map start/end device branch names (since we're only showing worked days, these should always have values)
         row["start_device_sn_branch"] = branch_map.get(str(row.get("start_device_sn")), "")
         row["end_device_sn_branch"] = branch_map.get(str(row.get("end_device_sn")), "")

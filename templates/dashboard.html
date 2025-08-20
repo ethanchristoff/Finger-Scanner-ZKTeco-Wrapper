@@ -159,6 +159,7 @@
         .badge-capped { background: #742a2a; color: #feb2b2; }
         .badge-auto { background: #744210; color: #fbd38d; }
         .badge-flagged { background: #2a4365; color: #90cdf4; }
+        .badge-late-checkout { background: #d69e2e; color: #faf089; }
         .table-container {
             background: #1a202c;
             border-radius: 12px;
@@ -203,8 +204,15 @@
         }
         .status-normal { background: #276749; color: #9ae6b4; }
         .status-capped { background: #742a2a; color: #feb2b2; }
+        .status-late-checkout { background: #d69e2e; color: #faf089; }
+        .status-late-in { background: #d53f8c; color: #f687b3; }
+        .status-early-out { background: #4299e1; color: #90cdf4; }
         .time-flagged { 
             color: #fc8181; 
+            font-weight: 600;
+        }
+        .time-late-checkout {
+            color: #d69e2e;
             font-weight: 600;
         }
         .time-auto { 
@@ -314,6 +322,10 @@
                         <span>Work hours limited by shift schedule</span>
                     </div>
                     <div class="legend-item">
+                        <span class="legend-badge badge-late-checkout">LATE CHECKOUT</span>
+                        <span>Checked out after shift end but before noon</span>
+                    </div>
+                    <div class="legend-item">
                         <span class="legend-badge badge-auto">AUTO END</span>
                         <span>No sign-out recorded</span>
                     </div>
@@ -352,14 +364,18 @@
                             <td>{{ row.day }}</td>
                             <td>{{ row.start_time.strftime('%H:%M') if row.start_time else '-' }}</td>
                             <td>
-                                {% if row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                                {% if row.shift_flag == "late checkout" %}
+                                    <span class="time-late-checkout" title="Late checkout - past shift end">{{ row.end_time.strftime('%H:%M') }} 🕐</span>
+                                {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
                                     <span class="time-auto" title="Auto-calculated end time">{{ row.end_time.strftime('%H:%M') }} ⏰</span>
                                 {% else %}
                                     {{ row.end_time.strftime('%H:%M') if row.end_time else '-' }}
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.shift_capped %}
+                                {% if row.shift_flag == "late checkout" %}
+                                    <span class="time-late-checkout" title="Actual time worked including late checkout">{{ row.time_spent }} 🔄</span>
+                                {% elif row.shift_capped %}
                                     <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
                                 {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
                                     <span class="time-auto" title="Calculated until end of day">{{ row.time_spent }}</span>
@@ -376,8 +392,16 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.shift_capped %}
+                                {% if row.shift_flag == "late checkout" %}
+                                    <span class="status-badge status-late-checkout">LATE CHECKOUT</span>
+                                {% elif row.shift_flag == "late in" %}
+                                    <span class="status-badge status-late-in">LATE IN</span>
+                                {% elif row.shift_flag == "early out" %}
+                                    <span class="status-badge status-early-out">EARLY OUT</span>
+                                {% elif row.shift_capped %}
                                     <span class="status-badge status-capped">SHIFT CAPPED</span>
+                                {% elif row.shift_flag == "on time" %}
+                                    <span class="status-badge status-normal">ON TIME</span>
                                 {% else %}
                                     <span class="status-badge status-normal">NORMAL</span>
                                 {% endif %}
