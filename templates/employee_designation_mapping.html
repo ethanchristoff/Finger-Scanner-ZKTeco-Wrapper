@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Designation Mapping</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Roboto', Arial, sans-serif; 
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%); 
+            color: #e2e8f0;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 40px auto; 
+            background: #2d3748; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3); 
+            padding: 32px 40px 40px 40px;
+            border: 1px solid #4a5568;
+        }
+        h1 { 
+            font-size: 2rem; 
+            font-weight: 700; 
+            margin-bottom: 24px; 
+            color: #f7fafc;
+            text-align: center;
+        }
+        form { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            margin-bottom: 32px; 
+        }
+        label { 
+            font-weight: 500; 
+            color: #e2e8f0; 
+        }
+        input[type="text"] { 
+            padding: 8px 12px; 
+            border: 1px solid #4a5568; 
+            border-radius: 8px; 
+            font-size: 1rem;
+            background: #1a202c;
+            color: #e2e8f0;
+            transition: all 0.2s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        .btn { 
+            padding: 9px 22px; 
+            background: #3182ce; 
+            color: #fff; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 1rem; 
+            transition: all 0.2s;
+        }
+        .btn:hover { 
+            background: #2c5282;
+            transform: translateY(-1px);
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            background: #1a202c; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            border: 1px solid #4a5568;
+        }
+        th, td { 
+            padding: 12px 16px; 
+            text-align: left;
+            border-bottom: 1px solid #4a5568;
+        }
+        th { 
+            background: #2d3748; 
+            font-weight: 700; 
+            color: #f7fafc;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            color: #e2e8f0;
+        }
+        tr:hover { 
+            background: #4a5568; 
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .msg { 
+            margin-bottom: 16px; 
+            padding: 12px 16px; 
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+        .msg.success { 
+            background: #276749; 
+            color: #9ae6b4;
+            border: 1px solid #38a169;
+        }
+        .msg.error { 
+            background: #742a2a; 
+            color: #feb2b2;
+            border: 1px solid #e53e3e;
+        }
+        a { 
+            color: #63b3ed; 
+            text-decoration: none; 
+            font-weight: 500; 
+        }
+        a:hover { 
+            text-decoration: underline;
+            color: #90cdf4;
+        }
+        h2 {
+            color: #f7fafc;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .btn-danger {
+            background: #e53e3e !important;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
+        .btn-danger:hover {
+            background: #c53030 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Employee Designation Mapping</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="msg {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <form method="post">
+            <label>Employee ID:
+                <input type="text" name="employee_id" required>
+            </label>
+            <label>Designation:
+                <input type="text" name="designation" required>
+            </label>
+            <button class="btn" type="submit">Add / Update Mapping</button>
+        </form>
+        <h2>Current Mappings</h2>
+        {% if mappings %}
+        <table>
+            <tr>
+                <th>Employee ID</th>
+                <th>Designation</th>
+                <th>Actions</th>
+            </tr>
+            {% for row in mappings %}
+            <tr>
+                <td>{{ row.employee_id }}</td>
+                <td>{{ row.designation }}</td>
+                <td>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="delete_employee_id" value="{{ row.employee_id }}">
+                        <button class="btn btn-danger" type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p>No mappings found.</p>
+        {% endif %}
+        <p style="margin-top:24px;"><a href="/">&larr; Back to Dashboard</a></p>
+    </div>
+</body>
+</html>
