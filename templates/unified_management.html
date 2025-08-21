@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Management - Complete System Administration</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .nav-links {
+            background: #34495e;
+            padding: 15px 30px;
+            text-align: center;
+        }
+        
+        .nav-links a {
+            color: #ecf0f1;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-links a:hover, .nav-links a.active {
+            background: #3498db;
+            transform: translateY(-2px);
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .tab-navigation {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 5px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            gap: 5px;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 15px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52,152,219,0.3);
+        }
+        
+        .tab-btn:hover:not(.active) {
+            background: #e9ecef;
+            color: #2c3e50;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .management-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .section-header h3 {
+            color: #2c3e50;
+            font-size: 1.3rem;
+        }
+        
+        .item-count {
+            background: #3498db;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52,152,219,0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(231,76,60,0.4);
+        }
+        
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .item-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            transition: all 0.3s ease;
+        }
+        
+        .item-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .item-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .item-details {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: background 0.3s ease;
+        }
+        
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+        
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        
+        .flash-message {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .flash-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #ddd;
+        }
+        
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .items-grid { grid-template-columns: 1fr; }
+            .tab-navigation { flex-direction: column; }
+            .tab-btn { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎛️ Unified Management Center</h1>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">📊 Dashboard</a>
+            <a href="/unified_management" class="active">🎛️ Management Center</a>
+        </div>
+        
+        <div class="content">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <div class="flash-message flash-success">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Quick Stats Overview -->
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-number">{{ employees|length }}</div>
+                    <div class="stat-label">👥 Employees</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ shift_templates|length }}</div>
+                    <div class="stat-label">🕐 Shift Templates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ all_branches|length }}</div>
+                    <div class="stat-label">🏢 Branches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ all_designations|length }}</div>
+                    <div class="stat-label">💼 Designations</div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" onclick="showTab('employees')">👥 Employees</button>
+                <button class="tab-btn" onclick="showTab('shifts')">🕐 Shift Templates</button>
+                <button class="tab-btn" onclick="showTab('branches')">🏢 Branches</button>
+                <button class="tab-btn" onclick="showTab('designations')">💼 Designations</button>
+                <button class="tab-btn" onclick="showTab('names')">📝 Employee Names</button>
+                <button class="tab-btn" onclick="showTab('devices')">📱 Device Mappings</button>
+            </div>
+            
+            <!-- Employees Tab -->
+            <div id="employees" class="tab-content active">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>👥 Employee Management</h3>
+                        <span class="item-count">{{ employees|length }} employees</span>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="employee">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="employee_id">Employee ID *</label>
+                                <input type="text" id="employee_id" name="employee_id" placeholder="Enter Employee ID" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="employee_name">Employee Name</label>
+                                <input type="text" id="employee_name" name="employee_name" placeholder="Enter full name" list="name_suggestions">
+                                <datalist id="name_suggestions">
+                                    {% for name in all_employee_names %}
+                                    <option value="{{ name }}">
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="form-group">
+                                <label for="designation">Designation</label>
+                                <input type="text" id="designation" name="designation" placeholder="Enter designation" list="designation_suggestions">
+                                <datalist id="designation_suggestions">
+                                    {% for designation in all_designations %}
+                                    <option value="{{ designation }}">
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="form-group">
+                                <label for="branch_name">Branch</label>
+                                <select id="branch_name" name="branch_name">
+                                    <option value="">-- Select Branch --</option>
+                                    {% for branch in all_branches %}
+                                    <option value="{{ branch }}">{{ branch }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="shift_name">Shift Template</label>
+                                <select id="shift_name" name="shift_name">
+                                    <option value="">-- Select Shift --</option>
+                                    {% for template in shift_templates %}
+                                    <option value="{{ template.shift_name }}">{{ template.shift_name }} ({{ template.shift_start }} - {{ template.shift_end }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">💾 Save Employee</button>
+                    </form>
+                    
+                    <div class="items-grid">
+                        {% for employee in employees %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">{{ employee.employee_id }}</div>
+                                <form method="POST" style="display: inline;">
+                                    <input type="hidden" name="action" value="delete_employee">
+                                    <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
+                                </form>
+                            </div>
+                            <div class="item-details">
+                                <strong>Name:</strong> {{ employee.employee_name or "Not set" }}<br>
+                                <strong>Designation:</strong> {{ employee.designation or "Not set" }}<br>
+                                <strong>Branch:</strong> {{ employee.branch_name or "Not set" }}<br>
+                                <strong>Shift:</strong> {{ employee.shift_name or "Not set" }}
+                                {% if employee.shift_start and employee.shift_end %}
+                                    ({{ employee.shift_start }} - {{ employee.shift_end }})
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not employees %}
+                        <div class="empty-state">
+                            No employees found. Add your first employee above!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Shift Templates Tab -->
+            <div id="shifts" class="tab-content">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>🕐 Shift Templates</h3>
+                        <span class="item-count">{{ shift_templates|length }} templates</span>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="shift_template">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="shift_name_new">Shift Name *</label>
+                                <input type="text" id="shift_name_new" name="shift_name" placeholder="e.g., Morning Shift" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="shift_start">Start Time *</label>
+                                <input type="time" id="shift_start" name="shift_start" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="shift_end">End Time *</label>
+                                <input type="time" id="shift_end" name="shift_end" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea id="description" name="description" placeholder="Optional description" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">💾 Save Shift Template</button>
+                    </form>
+                    
+                    <div class="items-grid">
+                        {% for template in shift_templates %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">{{ template.shift_name }}</div>
+                                <form method="POST" style="display: inline;">
+                                    <input type="hidden" name="action" value="delete_shift_template">
+                                    <input type="hidden" name="delete_shift_name" value="{{ template.shift_name }}">
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Delete shift template {{ template.shift_name }}?')">🗑️</button>
+                                </form>
+                            </div>
+                            <div class="item-details">
+                                <strong>Time:</strong> {{ template.shift_start }} - {{ template.shift_end }}<br>
+                                <strong>Description:</strong> {{ template.description or "No description" }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not shift_templates %}
+                        <div class="empty-state">
+                            No shift templates found. Create your first template above!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Branches Tab -->
+            <div id="branches" class="tab-content">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>🏢 Device Branch Mappings</h3>
+                        <span class="item-count">{{ device_mappings|length }} mappings</span>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="device_branch">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="serial_number">Device Serial Number *</label>
+                                <input type="text" id="serial_number" name="serial_number" placeholder="Enter device serial" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="branch_name_device">Branch Name *</label>
+                                <input type="text" id="branch_name_device" name="branch_name" placeholder="Enter branch name" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">💾 Save Device Mapping</button>
+                    </form>
+                    
+                    <div class="items-grid">
+                        {% for mapping in device_mappings %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">{{ mapping.serial_number }}</div>
+                                <form method="POST" style="display: inline;">
+                                    <input type="hidden" name="action" value="delete_device_branch">
+                                    <input type="hidden" name="delete_serial_number" value="{{ mapping.serial_number }}">
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Delete device mapping {{ mapping.serial_number }}?')">🗑️</button>
+                                </form>
+                            </div>
+                            <div class="item-details">
+                                <strong>Branch:</strong> {{ mapping.branch_name }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not device_mappings %}
+                        <div class="empty-state">
+                            No device mappings found. Add your first mapping above!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Designations Tab -->
+            <div id="designations" class="tab-content">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>💼 Employee Designations</h3>
+                        <span class="item-count">{{ all_designations|length }} designations</span>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="designation">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="employee_id_des">Employee ID *</label>
+                                <input type="text" id="employee_id_des" name="employee_id" placeholder="Enter Employee ID" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="designation_new">Designation *</label>
+                                <input type="text" id="designation_new" name="designation" placeholder="Enter designation" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">💾 Save Designation</button>
+                    </form>
+                    
+                    <div class="items-grid">
+                        {% for designation in all_designations %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">{{ designation }}</div>
+                            </div>
+                            <div class="item-details">
+                                <em>Used by multiple employees</em>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not all_designations %}
+                        <div class="empty-state">
+                            No designations found. Add your first designation above!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Employee Names Tab -->
+            <div id="names" class="tab-content">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>📝 Employee Names</h3>
+                        <span class="item-count">{{ all_employee_names|length }} names</span>
+                    </div>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="employee_name">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="employee_id_name">Employee ID *</label>
+                                <input type="text" id="employee_id_name" name="employee_id" placeholder="Enter Employee ID" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="employee_name_new">Employee Name *</label>
+                                <input type="text" id="employee_name_new" name="employee_name" placeholder="Enter full name" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">💾 Save Employee Name</button>
+                    </form>
+                    
+                    <div class="items-grid">
+                        {% for name in all_employee_names %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">{{ name }}</div>
+                            </div>
+                            <div class="item-details">
+                                <em>Employee name</em>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not all_employee_names %}
+                        <div class="empty-state">
+                            No employee names found. Add your first name above!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Device Mappings Tab (already implemented above) -->
+            <div id="devices" class="tab-content">
+                <div class="management-section">
+                    <div class="section-header">
+                        <h3>📱 Device Mappings</h3>
+                        <span class="item-count">{{ device_mappings|length }} devices</span>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px;">
+                        This section is already covered in the "Branches" tab above. Device-to-branch mappings define which physical devices belong to which branches.
+                    </p>
+                    <div class="items-grid">
+                        {% for mapping in device_mappings %}
+                        <div class="item-card">
+                            <div class="item-header">
+                                <div class="item-title">Device: {{ mapping.serial_number }}</div>
+                            </div>
+                            <div class="item-details">
+                                <strong>Branch:</strong> {{ mapping.branch_name }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not device_mappings %}
+                        <div class="empty-state">
+                            No device mappings found. Use the "Branches" tab to add device mappings!
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tab buttons
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+        
+        // Form validation
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const action = this.querySelector('input[name="action"]');
+                if (action && action.value === 'employee') {
+                    const employeeId = this.querySelector('input[name="employee_id"]').value.trim();
+                    if (!employeeId) {
+                        e.preventDefault();
+                        alert('Employee ID is required!');
+                        return false;
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -273,6 +273,109 @@ def employee_management() -> Any:
                          shift_templates=shift_templates)
 
 
+@app.route("/unified_management", methods=["GET", "POST"])
+def unified_management() -> Any:
+    """Unified management interface for all system entities."""
+    if request.method == "POST":
+        action = request.form.get("action")
+        
+        if action == "employee":
+            # Handle employee management
+            delete_emp_id = request.form.get("delete_employee_id")
+            if delete_emp_id:
+                delete_comprehensive_employee(delete_emp_id)
+                flash(f"Employee deleted: {delete_emp_id}", "success")
+                return redirect(url_for("unified_management"))
+            
+            employee_id = request.form.get("employee_id")
+            employee_name = request.form.get("employee_name", "")
+            designation = request.form.get("designation", "")
+            branch_name = request.form.get("branch_name", "")
+            shift_name = request.form.get("shift_name", "")
+            
+            if employee_id:
+                add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+                flash(f"Employee data updated: {employee_id}", "success")
+            else:
+                flash("Employee ID is required.", "error")
+        
+        elif action == "shift_template":
+            # Handle shift template management
+            delete_shift_name = request.form.get("delete_shift_name")
+            if delete_shift_name:
+                delete_shift_template(delete_shift_name)
+                flash(f"Shift template deleted: {delete_shift_name}", "success")
+                return redirect(url_for("unified_management"))
+            
+            shift_name = request.form.get("shift_name")
+            shift_start = request.form.get("shift_start")
+            shift_end = request.form.get("shift_end")
+            description = request.form.get("description", "")
+            
+            if shift_name and shift_start and shift_end:
+                add_shift_template(shift_name, shift_start, shift_end, description)
+                flash(f"Shift template added: {shift_name}", "success")
+            else:
+                flash("Shift name, start time, and end time are required.", "error")
+        
+        elif action == "device_branch":
+            # Handle device branch mapping
+            delete_serial = request.form.get("delete_serial_number")
+            if delete_serial:
+                delete_device_branch_mapping(delete_serial)
+                flash(f"Device mapping deleted: {delete_serial}", "success")
+                return redirect(url_for("unified_management"))
+            
+            serial_number = request.form.get("serial_number")
+            branch_name = request.form.get("branch_name")
+            
+            if serial_number and branch_name:
+                add_device_branch_mapping(serial_number, branch_name)
+                flash(f"Device mapping added: {serial_number} → {branch_name}", "success")
+            else:
+                flash("Serial number and branch name are required.", "error")
+        
+        elif action == "designation":
+            # Handle designation mapping
+            employee_id = request.form.get("employee_id")
+            designation = request.form.get("designation")
+            
+            if employee_id and designation:
+                add_employee_designation_mapping(employee_id, designation)
+                flash(f"Designation mapping added: {employee_id} → {designation}", "success")
+            else:
+                flash("Employee ID and designation are required.", "error")
+        
+        elif action == "employee_name":
+            # Handle employee name mapping
+            employee_id = request.form.get("employee_id")
+            employee_name = request.form.get("employee_name")
+            
+            if employee_id and employee_name:
+                add_employee_name_mapping(employee_id, employee_name)
+                flash(f"Employee name mapping added: {employee_id} → {employee_name}", "success")
+            else:
+                flash("Employee ID and employee name are required.", "error")
+        
+        return redirect(url_for("unified_management"))
+    
+    # Get data for display
+    employees = get_comprehensive_employee_data() or []
+    shift_templates = get_shift_templates() or []
+    device_mappings = get_device_branch_mappings() or []
+    all_branches = sorted({b["branch_name"] for b in device_mappings})
+    all_designations = sorted({d["designation"] for d in get_employee_designation_mappings() or []})
+    all_employee_names = sorted({n["employee_name"] for n in get_employee_name_mappings() or []})
+    
+    return render_template("unified_management.html", 
+                         employees=employees,
+                         shift_templates=shift_templates,
+                         device_mappings=device_mappings,
+                         all_branches=all_branches,
+                         all_designations=all_designations,
+                         all_employee_names=all_employee_names)
+
+
 def ensure_directories_exist() -> None:
     """Ensure the static and templates folders exist."""
     if not os.path.exists("static"):
