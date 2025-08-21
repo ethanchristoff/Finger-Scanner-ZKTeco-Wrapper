@@ -243,16 +243,36 @@ def filter_attendances_by_employee_branch(df: pd.DataFrame, employee_branch: str
     return df
 
 
+def filter_attendances_by_employee_name(df: pd.DataFrame, employee_name: str) -> pd.DataFrame:
+    """Filter attendances by employee name."""
+    employee_name_mappings = get_employee_name_mappings() or []
+    name_employees = [str(en["employee_id"]) for en in employee_name_mappings if employee_name.lower() in en["employee_name"].lower()]
+    if name_employees:
+        df = df[df["employee_id"].astype(str).isin(name_employees)]
+    return df
+
+
+def filter_attendances_by_designation(df: pd.DataFrame, designation: str) -> pd.DataFrame:
+    """Filter attendances by designation."""
+    employee_designation_mappings = get_employee_designation_mappings() or []
+    designation_employees = [str(ed["employee_id"]) for ed in employee_designation_mappings if designation.lower() in ed["designation"].lower()]
+    if designation_employees:
+        df = df[df["employee_id"].astype(str).isin(designation_employees)]
+    return df
+
+
 def apply_filters(
     attendences: list[dict[str, Any]],
     start_date: str | None,
     end_date: str | None,
     employee_id: str | None,
     branch_name: str | None,
-    employee_branch: str | None
+    employee_branch: str | None,
+    employee_name: str | None = None,
+    designation: str | None = None
 ) -> list[dict[str, Any]]:
     """Apply all filters to attendances."""
-    if not (start_date or end_date or employee_id or branch_name or employee_branch):
+    if not (start_date or end_date or employee_id or branch_name or employee_branch or employee_name or designation):
         return attendences
     
     df = pd.DataFrame(attendences)
@@ -267,6 +287,12 @@ def apply_filters(
     
     if employee_branch:
         df = filter_attendances_by_employee_branch(df, employee_branch)
+    
+    if employee_name:
+        df = filter_attendances_by_employee_name(df, employee_name)
+    
+    if designation:
+        df = filter_attendances_by_designation(df, designation)
     
     return df.to_dict(orient="records")
 
@@ -318,9 +344,11 @@ def index() -> Any:
     employee_id = request.args.get("employee_id")
     branch_name = request.args.get("branch_name")
     employee_branch = request.args.get("employee_branch")
+    employee_name = request.args.get("employee_name")
+    designation = request.args.get("designation")
 
     attendences = get_attendences() or []
-    attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch)
+    attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch, employee_name, designation)
 
     shift_mappings = get_user_shift_mappings() or []
     summary = prepare_dashboard_summary(attendences, shift_mappings)
@@ -332,6 +360,12 @@ def index() -> Any:
     all_employees = list({str(a.get("employee_id", "")) for a in get_attendences() or [] if a.get("employee_id")})
     all_branches = list({b["branch_name"] for b in get_device_branch_mappings() or []})
     all_employee_branches = list({eb["branch_name"] for eb in get_employee_branch_mappings() or []})
+    
+    # Get employee names and designations for searchable dropdowns
+    employee_names = get_employee_name_mappings() or []
+    employee_designations = get_employee_designation_mappings() or []
+    all_employee_names = sorted([name["employee_name"] for name in employee_names if name.get("employee_name")])
+    all_designations = sorted(list({des["designation"] for des in employee_designations if des.get("designation")}))
 
     return render_template(
         "dashboard.html",
@@ -342,9 +376,13 @@ def index() -> Any:
         employee_id=employee_id or "",
         branch_name=branch_name or "",
         employee_branch=employee_branch or "",
+        employee_name=employee_name or "",
+        designation=designation or "",
         all_employees=sorted(all_employees),
         all_branches=sorted(all_branches),
         all_employee_branches=sorted(all_employee_branches),
+        all_employee_names=all_employee_names,
+        all_designations=all_designations,
         shift_mappings=shift_mappings,
     )
 
@@ -356,16 +394,19 @@ def download_xlsx() -> Any:
     employee_id = request.args.get("employee_id")
     branch_name = request.args.get("branch_name")
     employee_branch = request.args.get("employee_branch")
+    employee_name = request.args.get("employee_name")
+    designation = request.args.get("designation")
 
     # Validate that both start_date and end_date are provided
     if not start_date or not end_date:
         flash("Both start date and end date are required to download the Excel file.", "error")
-        return redirect(url_for("index", start_date=start_date or "", end_date=end_date or "", 
-                               employee_id=employee_id or "", branch_name=branch_name or "", 
-                               employee_branch=employee_branch or ""))
+        return redirect(url_for("index", start_date=start_date or "", end_date=end_date or "",
+                               employee_id=employee_id or "", branch_name=branch_name or "",
+                               employee_branch=employee_branch or "", employee_name=employee_name or "",
+                               designation=designation or ""))
 
     attendences = get_attendences() or []
-    attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch)
+    attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch, employee_name, designation)
 
     device_logs = get_device_logs() or []
     finger_logs = get_finger_log() or []

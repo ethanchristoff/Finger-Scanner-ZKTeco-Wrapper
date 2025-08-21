@@ -128,6 +128,58 @@
             background: #3182ce; 
             color: white; 
         }
+        
+        /* Searchable Dropdown Styles */
+        .searchable-dropdown {
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            background: #2d3748;
+            color: #e2e8f0;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        .dropdown-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #2d3748;
+            border: 2px solid #4a5568;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            color: #e2e8f0;
+            border-bottom: 1px solid #4a5568;
+        }
+        .dropdown-item:hover {
+            background: #4a5568;
+        }
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        .dropdown-item.selected {
+            background: #3182ce;
+            color: white;
+        }
+        
         .legend {
             background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
             border: 1px solid #4a5568;
@@ -278,22 +330,52 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Employee Name</label>
+                            <div class="searchable-dropdown">
+                                <input type="text" name="employee_name" value="{{ employee_name }}" placeholder="Search employee names..." class="search-input" autocomplete="off">
+                                <div class="dropdown-list" style="display: none;">
+                                    <div class="dropdown-item" data-value="">All Employee Names</div>
+                                    {% for name in all_employee_names %}
+                                    <div class="dropdown-item" data-value="{{ name }}">{{ name }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Designation</label>
+                            <div class="searchable-dropdown">
+                                <input type="text" name="designation" value="{{ designation }}" placeholder="Search designations..." class="search-input" autocomplete="off">
+                                <div class="dropdown-list" style="display: none;">
+                                    <div class="dropdown-item" data-value="">All Designations</div>
+                                    {% for des in all_designations %}
+                                    <div class="dropdown-item" data-value="{{ des }}">{{ des }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label>Device Branch</label>
-                            <select name="branch_name">
-                                <option value="">All Branches</option>
-                                {% for branch in all_branches %}
-                                <option value="{{ branch }}" {% if branch == branch_name %}selected{% endif %}>{{ branch }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="searchable-dropdown">
+                                <input type="text" name="branch_name" value="{{ branch_name }}" placeholder="Search device branches..." class="search-input" autocomplete="off">
+                                <div class="dropdown-list" style="display: none;">
+                                    <div class="dropdown-item" data-value="">All Branches</div>
+                                    {% for branch in all_branches %}
+                                    <div class="dropdown-item" data-value="{{ branch }}">{{ branch }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Employee Branch</label>
-                            <select name="employee_branch">
-                                <option value="">All Employee Branches</option>
-                                {% for emp_branch in all_employee_branches %}
-                                <option value="{{ emp_branch }}" {% if emp_branch == employee_branch %}selected{% endif %}>{{ emp_branch }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="searchable-dropdown">
+                                <input type="text" name="employee_branch" value="{{ employee_branch }}" placeholder="Search employee branches..." class="search-input" autocomplete="off">
+                                <div class="dropdown-list" style="display: none;">
+                                    <div class="dropdown-item" data-value="">All Employee Branches</div>
+                                    {% for emp_branch in all_employee_branches %}
+                                    <div class="dropdown-item" data-value="{{ emp_branch }}">{{ emp_branch }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="actions">
@@ -467,6 +549,80 @@
     </div>
     
     <script>
+        // Searchable dropdown functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchableDropdowns = document.querySelectorAll('.searchable-dropdown');
+            
+            searchableDropdowns.forEach(dropdown => {
+                const input = dropdown.querySelector('.search-input');
+                const dropdownList = dropdown.querySelector('.dropdown-list');
+                const items = dropdownList.querySelectorAll('.dropdown-item');
+                
+                // Show dropdown when input is focused
+                input.addEventListener('focus', function() {
+                    dropdownList.style.display = 'block';
+                    filterItems('');
+                });
+                
+                // Filter items as user types
+                input.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    filterItems(searchTerm);
+                    dropdownList.style.display = 'block';
+                });
+                
+                // Handle item selection
+                items.forEach(item => {
+                    item.addEventListener('click', function() {
+                        input.value = this.getAttribute('data-value');
+                        dropdownList.style.display = 'none';
+                        
+                        // Remove selected class from all items
+                        items.forEach(i => i.classList.remove('selected'));
+                        // Add selected class to clicked item
+                        this.classList.add('selected');
+                    });
+                });
+                
+                // Filter function
+                function filterItems(searchTerm) {
+                    items.forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        if (text.includes(searchTerm)) {
+                            item.style.display = 'block';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Hide dropdown when clicking outside
+                document.addEventListener('click', function(event) {
+                    if (!dropdown.contains(event.target)) {
+                        dropdownList.style.display = 'none';
+                    }
+                });
+                
+                // Set initial selected state based on input value
+                const currentValue = input.value;
+                if (currentValue) {
+                    items.forEach(item => {
+                        if (item.getAttribute('data-value') === currentValue) {
+                            item.classList.add('selected');
+                        }
+                    });
+                }
+            });
+            
+            // Clear error styling when user starts typing in date fields
+            const dateFields = document.querySelectorAll('input[name="start_date"], input[name="end_date"]');
+            dateFields.forEach(field => {
+                field.addEventListener('input', function() {
+                    this.style.borderColor = '';
+                });
+            });
+        });
+        
         function downloadExcel() {
             const startDate = document.querySelector('input[name="start_date"]').value;
             const endDate = document.querySelector('input[name="end_date"]').value;
@@ -502,29 +658,23 @@
             
             // If validation passes, construct the download URL
             const employeeId = document.querySelector('select[name="employee_id"]').value;
-            const branchName = document.querySelector('select[name="branch_name"]').value;
-            const employeeBranch = document.querySelector('select[name="employee_branch"]').value;
+            const branchName = document.querySelector('input[name="branch_name"]').value;
+            const employeeBranch = document.querySelector('input[name="employee_branch"]').value;
+            const employeeName = document.querySelector('input[name="employee_name"]').value;
+            const designation = document.querySelector('input[name="designation"]').value;
             
             const params = new URLSearchParams({
                 start_date: startDate,
                 end_date: endDate,
                 employee_id: employeeId,
                 branch_name: branchName,
-                employee_branch: employeeBranch
+                employee_branch: employeeBranch,
+                employee_name: employeeName,
+                designation: designation
             });
             
             window.location.href = `/download_xlsx?${params.toString()}`;
         }
-        
-        // Clear error styling when user starts typing in date fields
-        document.addEventListener('DOMContentLoaded', function() {
-            const dateFields = document.querySelectorAll('input[name="start_date"], input[name="end_date"]');
-            dateFields.forEach(field => {
-                field.addEventListener('input', function() {
-                    this.style.borderColor = '';
-                });
-            });
-        });
     </script>
 </body>
 </html>
