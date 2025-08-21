@@ -261,11 +261,11 @@
                 <form method="get">
                     <div class="filters-grid">
                         <div class="form-group">
-                            <label>Start Date</label>
+                            <label>Start Date <span style="color: #e53e3e;">*</span></label>
                             <input type="date" name="start_date" value="{{ start_date }}">
                         </div>
                         <div class="form-group">
-                            <label>End Date</label>
+                            <label>End Date <span style="color: #e53e3e;">*</span></label>
                             <input type="date" name="end_date" value="{{ end_date }}">
                         </div>
                         <div class="form-group">
@@ -300,9 +300,9 @@
                         <button class="btn btn-primary" type="submit">
                             <span>🔍</span> Filter Data
                         </button>
-                        <a href="/download_xlsx?start_date={{ start_date }}&end_date={{ end_date }}&employee_id={{ employee_id }}&branch_name={{ branch_name }}&employee_branch={{ employee_branch }}" class="btn btn-success">
+                        <button type="button" class="btn btn-success" onclick="downloadExcel()">
                             <span>📊</span> Download Excel
-                        </a>
+                        </button>
                         <a href="/device_branch_mapping" class="btn btn-secondary">
                             <span>🔗</span> Device Mapping
                         </a>
@@ -318,6 +318,9 @@
                         <a href="/employee_name_mapping" class="btn btn-info">
                             <span>📝</span> Employee Names
                         </a>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 0.8rem; color: #a0aec0; text-align: center;">
+                        <span style="color: #e53e3e;">*</span> Start Date and End Date are required for Excel download
                     </div>
                 </form>
             </div>
@@ -462,5 +465,66 @@
             {% endif %}
         </div>
     </div>
+    
+    <script>
+        function downloadExcel() {
+            const startDate = document.querySelector('input[name="start_date"]').value;
+            const endDate = document.querySelector('input[name="end_date"]').value;
+            
+            if (!startDate || !endDate) {
+                alert('⚠️ Both start date and end date are required to download the Excel file.\n\nPlease select a date range before downloading.');
+                
+                // Highlight the date fields if they're empty
+                const startDateField = document.querySelector('input[name="start_date"]');
+                const endDateField = document.querySelector('input[name="end_date"]');
+                
+                if (!startDate) {
+                    startDateField.style.borderColor = '#e53e3e';
+                    startDateField.focus();
+                }
+                if (!endDate) {
+                    endDateField.style.borderColor = '#e53e3e';
+                    if (!startDate) {
+                        setTimeout(() => endDateField.focus(), 100);
+                    } else {
+                        endDateField.focus();
+                    }
+                }
+                
+                // Reset border color after 3 seconds
+                setTimeout(() => {
+                    startDateField.style.borderColor = '';
+                    endDateField.style.borderColor = '';
+                }, 3000);
+                
+                return;
+            }
+            
+            // If validation passes, construct the download URL
+            const employeeId = document.querySelector('select[name="employee_id"]').value;
+            const branchName = document.querySelector('select[name="branch_name"]').value;
+            const employeeBranch = document.querySelector('select[name="employee_branch"]').value;
+            
+            const params = new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate,
+                employee_id: employeeId,
+                branch_name: branchName,
+                employee_branch: employeeBranch
+            });
+            
+            window.location.href = `/download_xlsx?${params.toString()}`;
+        }
+        
+        // Clear error styling when user starts typing in date fields
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateFields = document.querySelectorAll('input[name="start_date"], input[name="end_date"]');
+            dateFields.forEach(field => {
+                field.addEventListener('input', function() {
+                    this.style.borderColor = '';
+                });
+            });
+        });
+    </script>
 </body>
 </html>

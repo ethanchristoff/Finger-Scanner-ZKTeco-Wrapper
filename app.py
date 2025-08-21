@@ -357,6 +357,13 @@ def download_xlsx() -> Any:
     branch_name = request.args.get("branch_name")
     employee_branch = request.args.get("employee_branch")
 
+    # Validate that both start_date and end_date are provided
+    if not start_date or not end_date:
+        flash("Both start date and end date are required to download the Excel file.", "error")
+        return redirect(url_for("index", start_date=start_date or "", end_date=end_date or "", 
+                               employee_id=employee_id or "", branch_name=branch_name or "", 
+                               employee_branch=employee_branch or ""))
+
     attendences = get_attendences() or []
     attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch)
 
