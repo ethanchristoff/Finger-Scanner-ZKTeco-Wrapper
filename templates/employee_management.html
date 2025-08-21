@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Management - Complete Employee Setup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .nav-links {
+            background: #34495e;
+            padding: 15px 30px;
+            text-align: center;
+        }
+        
+        .nav-links a {
+            color: #ecf0f1;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-links a:hover {
+            background: #3498db;
+            transform: translateY(-2px);
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .form-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input, .form-group select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52,152,219,0.4);
+        }
+        
+        .table-section {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .table-header {
+            background: #34495e;
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s ease;
+        }
+        
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+        
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        
+        .flash-message {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .flash-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .data-cell {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-partial {
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .status-minimal {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .searchable-select {
+            position: relative;
+        }
+        
+        .select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .select-option {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .select-option:hover {
+            background: #f8f9fa;
+        }
+        
+        .select-option:last-child {
+            border-bottom: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .nav-links a { margin: 5px; display: inline-block; }
+            table { min-width: 600px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 Comprehensive Employee Management</h1>
+            <p>Manage all employee attributes from one centralized location</p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">📊 Dashboard</a>
+            <a href="/employee_management">👥 Employee Management</a>
+            <a href="/shift_templates">🕐 Shift Templates</a>
+            <a href="/user_shift_mapping">⏰ User Shifts</a>
+            <a href="/device_branch_mapping">🏢 Device Branches</a>
+            <a href="/employee_designation_mapping">💼 Designations</a>
+            <a href="/employee_name_mapping">📝 Employee Names</a>
+            <a href="/employee_branch_mapping">🌐 Employee Branches</a>
+        </div>
+        
+        <div class="content">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <div class="flash-message flash-success">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <div class="form-section">
+                <h3>➕ Add/Update Employee Information</h3>
+                <form method="POST">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="employee_id">Employee ID * <small>(Required)</small></label>
+                            <input type="text" id="employee_id" name="employee_id" placeholder="Enter Employee ID" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="employee_name">Employee Name <small>(Optional)</small></label>
+                            <input type="text" id="employee_name" name="employee_name" placeholder="Enter full name or select existing">
+                            <datalist id="name_suggestions">
+                                {% for name in all_employee_names %}
+                                <option value="{{ name }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="designation">Designation <small>(Optional)</small></label>
+                            <input type="text" id="designation" name="designation" list="designation_suggestions" placeholder="Enter designation or select existing">
+                            <datalist id="designation_suggestions">
+                                {% for designation in all_designations %}
+                                <option value="{{ designation }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="branch_name">Branch <small>(Optional)</small></label>
+                            <select id="branch_name" name="branch_name">
+                                <option value="">-- Select Branch --</option>
+                                {% for branch in all_branches %}
+                                <option value="{{ branch }}">{{ branch }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="shift_name">Shift Template <small>(Optional)</small></label>
+                            <select id="shift_name" name="shift_name">
+                                <option value="">-- Select Shift --</option>
+                                {% for template in shift_templates %}
+                                <option value="{{ template.shift_name }}" title="{{ template.shift_start }} - {{ template.shift_end }}">
+                                    {{ template.shift_name }} ({{ template.shift_start }} - {{ template.shift_end }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">💾 Save Employee Data</button>
+                    <small style="color: #666; margin-left: 15px;">
+                        Only Employee ID is required. Leave other fields empty to keep existing values unchanged.
+                    </small>
+                </form>
+            </div>
+            
+            <div class="table-section">
+                <div class="table-header">
+                    📋 All Employees ({{ employees|length }})
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Name</th>
+                                <th>Designation</th>
+                                <th>Branch</th>
+                                <th>Shift</th>
+                                <th>Shift Times</th>
+                                <th>Completeness</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for employee in employees %}
+                            <tr>
+                                <td><strong>{{ employee.employee_id }}</strong></td>
+                                <td class="data-cell" title="{{ employee.employee_name or 'Not set' }}">
+                                    {{ employee.employee_name or "—" }}
+                                </td>
+                                <td class="data-cell" title="{{ employee.designation or 'Not set' }}">
+                                    {{ employee.designation or "—" }}
+                                </td>
+                                <td class="data-cell" title="{{ employee.branch_name or 'Not set' }}">
+                                    {{ employee.branch_name or "—" }}
+                                </td>
+                                <td class="data-cell" title="{{ employee.shift_name or 'Not set' }}">
+                                    {{ employee.shift_name or "—" }}
+                                </td>
+                                <td>
+                                    {% if employee.shift_start and employee.shift_end %}
+                                        <small>{{ employee.shift_start }} - {{ employee.shift_end }}</small>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set fields_filled = 0 %}
+                                    {% if employee.employee_name %}{% set fields_filled = fields_filled + 1 %}{% endif %}
+                                    {% if employee.designation %}{% set fields_filled = fields_filled + 1 %}{% endif %}
+                                    {% if employee.branch_name %}{% set fields_filled = fields_filled + 1 %}{% endif %}
+                                    {% if employee.shift_name %}{% set fields_filled = fields_filled + 1 %}{% endif %}
+                                    
+                                    {% if fields_filled == 4 %}
+                                        <span class="status-complete">Complete</span>
+                                    {% elif fields_filled >= 2 %}
+                                        <span class="status-partial">{{ fields_filled }}/4 fields</span>
+                                    {% else %}
+                                        <span class="status-minimal">{{ fields_filled }}/4 fields</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" style="display: inline;">
+                                        <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
+                                        <button type="submit" class="delete-btn" 
+                                                onclick="return confirm('Delete all data for employee {{ employee.employee_id }}?')">
+                                            🗑️ Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if not employees %}
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: #666; font-style: italic; padding: 30px;">
+                                    No employee data found. Add employee information above to get started!
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: #e8f4f8; border-radius: 10px; border-left: 4px solid #3498db;">
+                <h4 style="color: #2c3e50; margin-bottom: 15px;">💡 How to Use This Page</h4>
+                <ul style="color: #555; line-height: 1.6;">
+                    <li><strong>Employee ID:</strong> Required field - the unique identifier for each employee</li>
+                    <li><strong>Employee Name:</strong> Optional - you can type a new name or select from existing names</li>
+                    <li><strong>Designation:</strong> Optional - you can type a new designation or select from existing ones</li>
+                    <li><strong>Branch:</strong> Optional - select from branches configured in device mappings</li>
+                    <li><strong>Shift Template:</strong> Optional - select from predefined shift templates with times</li>
+                    <li><strong>Updating:</strong> Enter an existing Employee ID to update their information</li>
+                    <li><strong>Partial Updates:</strong> Leave fields empty to keep existing values unchanged</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-complete functionality for employee name and designation fields
+        document.getElementById('employee_name').setAttribute('list', 'name_suggestions');
+        document.getElementById('designation').setAttribute('list', 'designation_suggestions');
+        
+        // Form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const employeeId = document.getElementById('employee_id').value.trim();
+            if (!employeeId) {
+                e.preventDefault();
+                alert('Employee ID is required!');
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

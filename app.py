@@ -6,17 +6,23 @@ from flask import Flask, flash, redirect, render_template, request, send_file, u
 
 from adms_wrapper.__main__ import process_attendance_summary
 from adms_wrapper.core.db_queries import (
+    add_comprehensive_employee,
     add_device_branch_mapping,
     add_employee_branch_mapping,
     add_employee_designation_mapping,
     add_employee_name_mapping,
+    add_shift_template,
     add_user_shift_mapping,
+    assign_shift_template_to_user,
+    delete_comprehensive_employee,
     delete_device_branch_mapping,
     delete_employee_branch_mapping,
     delete_employee_designation_mapping,
     delete_employee_name_mapping,
+    delete_shift_template,
     delete_user_shift_mapping,
     get_attendences,
+    get_comprehensive_employee_data,
     get_device_branch_mappings,
     get_device_logs,
     get_employee_branch_mappings,
@@ -24,6 +30,7 @@ from adms_wrapper.core.db_queries import (
     get_employee_name_mappings,
     get_finger_log,
     get_migrations,
+    get_shift_templates,
     get_user_shift_mappings,
     get_users,
 )
@@ -199,6 +206,71 @@ def employee_branch_mapping() -> Any:
     mappings = get_employee_branch_mappings() or []
     all_branches = list({b["branch_name"] for b in get_device_branch_mappings() or []})
     return render_template("employee_branch_mapping.html", mappings=mappings, all_branches=all_branches)
+
+
+@app.route("/shift_templates", methods=["GET", "POST"])
+def shift_templates() -> Any:
+    """Manage shift templates."""
+    if request.method == "POST":
+        delete_shift_name = request.form.get("delete_shift_name")
+        if delete_shift_name:
+            delete_shift_template(delete_shift_name)
+            flash(f"Shift template deleted: {delete_shift_name}", "success")
+            return redirect(url_for("shift_templates"))
+        
+        shift_name = request.form.get("shift_name")
+        shift_start = request.form.get("shift_start")
+        shift_end = request.form.get("shift_end")
+        description = request.form.get("description", "")
+        
+        if shift_name and shift_start and shift_end:
+            add_shift_template(shift_name, shift_start, shift_end, description)
+            flash(f"Shift template added: {shift_name}", "success")
+        else:
+            flash("Shift name, start time, and end time are required.", "error")
+        
+        return redirect(url_for("shift_templates"))
+    
+    templates = get_shift_templates() or []
+    return render_template("shift_templates.html", templates=templates)
+
+
+@app.route("/employee_management", methods=["GET", "POST"])
+def employee_management() -> Any:
+    """Comprehensive employee management."""
+    if request.method == "POST":
+        delete_emp_id = request.form.get("delete_employee_id")
+        if delete_emp_id:
+            delete_comprehensive_employee(delete_emp_id)
+            flash(f"Employee data deleted: {delete_emp_id}", "success")
+            return redirect(url_for("employee_management"))
+        
+        employee_id = request.form.get("employee_id")
+        employee_name = request.form.get("employee_name", "")
+        designation = request.form.get("designation", "")
+        branch_name = request.form.get("branch_name", "")
+        shift_name = request.form.get("shift_name", "")
+        
+        if employee_id:
+            add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+            flash(f"Employee data updated: {employee_id}", "success")
+        else:
+            flash("Employee ID is required.", "error")
+        
+        return redirect(url_for("employee_management"))
+    
+    employees = get_comprehensive_employee_data() or []
+    all_branches = sorted({b["branch_name"] for b in get_device_branch_mappings() or []})
+    all_designations = sorted({d["designation"] for d in get_employee_designation_mappings() or []})
+    all_employee_names = sorted({n["employee_name"] for n in get_employee_name_mappings() or []})
+    shift_templates = get_shift_templates() or []
+    
+    return render_template("employee_management.html", 
+                         employees=employees,
+                         all_branches=all_branches,
+                         all_designations=all_designations,
+                         all_employee_names=all_employee_names,
+                         shift_templates=shift_templates)
 
 
 def ensure_directories_exist() -> None:
