@@ -130,20 +130,13 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
     return shift_name, flag
 
 
-
 def apply_branch_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
     """Apply device branch mappings to summary DataFrame."""
     mappings = get_device_branch_mappings() or []
     mappings_df = pd.DataFrame(mappings)
 
-    summary_df["start_device_sn_branch"] = summary_df.apply(
-        lambda row: map_branch(row["start_device_sn"], mappings_df) if row["work_status"] == "worked" else "",
-        axis=1
-    )
-    summary_df["end_device_sn_branch"] = summary_df.apply(
-        lambda row: map_branch(row["end_device_sn"], mappings_df) if row["work_status"] == "worked" else "",
-        axis=1
-    )
+    summary_df["start_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["start_device_sn"], mappings_df) if row["work_status"] == "worked" else "", axis=1)
+    summary_df["end_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["end_device_sn"], mappings_df) if row["work_status"] == "worked" else "", axis=1)
     return summary_df
 
 
@@ -152,9 +145,7 @@ def apply_designation_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
     designation_mappings = get_employee_designation_mappings() or []
     designation_df = pd.DataFrame(designation_mappings)
     if not summary_df.empty and "employee_id" in summary_df.columns:
-        summary_df["designation"] = summary_df["employee_id"].apply(
-            lambda emp_id: map_designation(emp_id, designation_df)
-        )
+        summary_df["designation"] = summary_df["employee_id"].apply(lambda emp_id: map_designation(emp_id, designation_df))
     else:
         summary_df["designation"] = ""
     return summary_df
@@ -165,9 +156,7 @@ def apply_employee_branch_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
     employee_branch_mappings = get_employee_branch_mappings() or []
     employee_branch_df = pd.DataFrame(employee_branch_mappings)
     if not summary_df.empty and "employee_id" in summary_df.columns:
-        summary_df["employee_branch"] = summary_df["employee_id"].apply(
-            lambda emp_id: map_employee_branch(emp_id, employee_branch_df)
-        )
+        summary_df["employee_branch"] = summary_df["employee_id"].apply(lambda emp_id: map_employee_branch(emp_id, employee_branch_df))
     else:
         summary_df["employee_branch"] = ""
     return summary_df
@@ -178,9 +167,7 @@ def apply_employee_name_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
     employee_name_mappings = get_employee_name_mappings() or []
     employee_name_df = pd.DataFrame(employee_name_mappings)
     if not summary_df.empty and "employee_id" in summary_df.columns:
-        summary_df["employee_name"] = summary_df["employee_id"].apply(
-            lambda emp_id: map_employee_name(emp_id, employee_name_df)
-        )
+        summary_df["employee_name"] = summary_df["employee_id"].apply(lambda emp_id: map_employee_name(emp_id, employee_name_df))
     else:
         summary_df["employee_name"] = ""
     return summary_df
@@ -195,19 +182,13 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
 
     for idx, row in summary_df.iterrows():
         shift_capped = row.get("shift_capped", False)
-        
+
         if shift_capped:
-            shift_name, _ = get_shift_info_with_capped(
-                row["employee_id"], row["work_status"],
-                row["start_time"], row["end_time"], shift_df
-            )
+            shift_name, _ = get_shift_info_with_capped(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_df)
             flag = "shift_capped"
         else:
-            shift_name, flag = get_shift_info_with_capped(
-                row["employee_id"], row["work_status"],
-                row["start_time"], row["end_time"], shift_df
-            )
-        
+            shift_name, flag = get_shift_info_with_capped(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_df)
+
         summary_df.loc[idx, "shift_name"] = shift_name
         summary_df.loc[idx, "shift_flag"] = flag
 
@@ -247,7 +228,7 @@ def generate_attendance_summary(
     _finger_logs: list[dict[str, Any]],
     _migration_logs: list[dict[str, Any]],
     _user_logs: list[dict[str, Any]],
-    shift_mappings: list[dict[str, Any]] | None = None
+    shift_mappings: list[dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Generate attendance summary with all mappings applied."""
     summary_df = process_attendance_summary(attendences)
@@ -272,7 +253,7 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
     day_col = None
     work_status_col = None
     shift_capped_col = None
-    
+
     for idx, cell in enumerate(ws[1], start=1):
         if cell.value == "day":
             day_col = idx
@@ -280,7 +261,7 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
             work_status_col = idx
         if cell.value == "shift_capped":
             shift_capped_col = idx
-    
+
     return day_col, work_status_col, shift_capped_col
 
 
@@ -325,12 +306,7 @@ def apply_row_highlighting(ws: Any) -> None:
 
 
 def write_excel(
-    attendences: list[dict[str, Any]],
-    device_logs: list[dict[str, Any]],
-    finger_logs: list[dict[str, Any]],
-    migration_logs: list[dict[str, Any]],
-    user_logs: list[dict[str, Any]],
-    merged: pd.DataFrame
+    attendences: list[dict[str, Any]], device_logs: list[dict[str, Any]], finger_logs: list[dict[str, Any]], migration_logs: list[dict[str, Any]], user_logs: list[dict[str, Any]], merged: pd.DataFrame
 ) -> io.BytesIO:
     """Write data to Excel file with formatting."""
     output = io.BytesIO()

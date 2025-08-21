@@ -71,17 +71,17 @@ def assign_shift_template_to_user(user_id: str, shift_name: str):
     """Assign a shift template to a user by copying the template times."""
     create_shift_template_table()
     create_user_shift_mapping_table()
-    
+
     # Get the shift template
     template_query = "SELECT shift_start, shift_end FROM shift_template WHERE shift_name = %s"
     template_result = query_db(template_query, (shift_name,))
-    
+
     if not template_result:
         raise ValueError(f"Shift template '{shift_name}' not found")
-    
+
     shift_start = template_result[0]["shift_start"]
     shift_end = template_result[0]["shift_end"]
-    
+
     # Assign to user
     return add_user_shift_mapping(user_id, shift_name, str(shift_start), str(shift_end))
 
@@ -275,37 +275,29 @@ def get_comprehensive_employee_data(employee_id: str = None):
     """Get comprehensive employee data including all mappings."""
     if employee_id:
         # Get data for specific employee
-        employee_data = {
-            "employee_id": employee_id,
-            "employee_name": "",
-            "designation": "",
-            "branch_name": "",
-            "shift_name": "",
-            "shift_start": "",
-            "shift_end": ""
-        }
-        
+        employee_data = {"employee_id": employee_id, "employee_name": "", "designation": "", "branch_name": "", "shift_name": "", "shift_start": "", "shift_end": ""}
+
         # Get employee name
         name_mappings = get_employee_name_mappings() or []
         for mapping in name_mappings:
             if mapping["employee_id"] == employee_id:
                 employee_data["employee_name"] = mapping["employee_name"]
                 break
-        
+
         # Get designation
         designation_mappings = get_employee_designation_mappings() or []
         for mapping in designation_mappings:
             if mapping["employee_id"] == employee_id:
                 employee_data["designation"] = mapping["designation"]
                 break
-        
+
         # Get branch
         branch_mappings = get_employee_branch_mappings() or []
         for mapping in branch_mappings:
             if mapping["employee_id"] == employee_id:
                 employee_data["branch_name"] = mapping["branch_name"]
                 break
-        
+
         # Get shift
         shift_mappings = get_user_shift_mappings() or []
         for mapping in shift_mappings:
@@ -314,12 +306,12 @@ def get_comprehensive_employee_data(employee_id: str = None):
                 employee_data["shift_start"] = str(mapping["shift_start"])
                 employee_data["shift_end"] = str(mapping["shift_end"])
                 break
-        
+
         return employee_data
     else:
         # Get all employees with their comprehensive data
         all_employee_ids = set()
-        
+
         # Collect all unique employee IDs from all mapping tables
         for mapping in get_employee_name_mappings() or []:
             all_employee_ids.add(mapping["employee_id"])
@@ -329,32 +321,31 @@ def get_comprehensive_employee_data(employee_id: str = None):
             all_employee_ids.add(mapping["employee_id"])
         for mapping in get_user_shift_mappings() or []:
             all_employee_ids.add(mapping["user_id"])
-        
+
         # Get comprehensive data for each employee
         all_employees = []
         for emp_id in sorted(all_employee_ids):
             all_employees.append(get_comprehensive_employee_data(emp_id))
-        
+
         return all_employees
 
 
-def add_comprehensive_employee(employee_id: str, employee_name: str = "", designation: str = "", 
-                             branch_name: str = "", shift_name: str = ""):
+def add_comprehensive_employee(employee_id: str, employee_name: str = "", designation: str = "", branch_name: str = "", shift_name: str = ""):
     """Add or update comprehensive employee data."""
     results = []
-    
+
     # Add employee name if provided
     if employee_name:
         results.append(add_employee_name_mapping(employee_id, employee_name))
-    
+
     # Add designation if provided
     if designation:
         results.append(add_employee_designation_mapping(employee_id, designation))
-    
+
     # Add branch if provided
     if branch_name:
         results.append(add_employee_branch_mapping(employee_id, branch_name))
-    
+
     # Add shift if provided
     if shift_name:
         try:
@@ -362,33 +353,33 @@ def add_comprehensive_employee(employee_id: str, employee_name: str = "", design
         except ValueError:
             # If shift template doesn't exist, skip
             pass
-    
+
     return results
 
 
 def delete_comprehensive_employee(employee_id: str):
     """Delete all mappings for an employee."""
     results = []
-    
+
     # Delete from all mapping tables
     try:
         results.append(delete_employee_name_mapping(employee_id))
     except:
         pass
-    
+
     try:
         results.append(delete_employee_designation_mapping(employee_id))
     except:
         pass
-    
+
     try:
         results.append(delete_employee_branch_mapping(employee_id))
     except:
         pass
-    
+
     try:
         results.append(delete_user_shift_mapping(employee_id))
     except:
         pass
-    
+
     return results

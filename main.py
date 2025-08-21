@@ -18,9 +18,13 @@ def attendences(start_date: Optional[str] = Query(None, description="Start date 
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             if start_date:
-                df = df[df["timestamp"] >= pd.to_datetime(start_date)]
+                # Include full start day from 00:00:00
+                start_datetime = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+                df = df[df["timestamp"] >= start_datetime]
             if end_date:
-                df = df[df["timestamp"] <= pd.to_datetime(end_date)]
+                # Include full end day until 23:59:59
+                end_datetime = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+                df = df[df["timestamp"] <= end_datetime]
             return df.to_dict(orient="records")
     return data
 
@@ -58,9 +62,13 @@ def attendance_summary(start_date: Optional[str] = Query(None, description="Star
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             if start_date:
-                df = df[df["timestamp"] >= pd.to_datetime(start_date)]
+                # Include full start day from 00:00:00
+                start_datetime = pd.to_datetime(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+                df = df[df["timestamp"] >= start_datetime]
             if end_date:
-                df = df[df["timestamp"] <= pd.to_datetime(end_date)]
+                # Include full end day until 23:59:59
+                end_datetime = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
+                df = df[df["timestamp"] <= end_datetime]
             attendences = df.to_dict(orient="records")
     summary_df = process_attendance_summary(attendences)
     if summary_df is not None:
