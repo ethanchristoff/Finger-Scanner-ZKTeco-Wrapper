@@ -124,6 +124,10 @@
             background: #e53e3e; 
             color: white; 
         }
+        .btn-info { 
+            background: #3182ce; 
+            color: white; 
+        }
         .legend {
             background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
             border: 1px solid #4a5568;
@@ -311,6 +315,9 @@
                         <a href="/employee_branch_mapping" class="btn btn-danger">
                             <span>🏢</span> Branches
                         </a>
+                        <a href="/employee_name_mapping" class="btn btn-info">
+                            <span>📝</span> Employee Names
+                        </a>
                     </div>
                 </form>
             </div>
@@ -344,7 +351,8 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Employee</th>
+                            <th>Employee ID</th>
+                            <th>Employee Name</th>
                             <th>Designation</th>
                             <th>Branch</th>
                             <th>Date</th>
@@ -359,6 +367,7 @@
                         {% for row in summary %}
                         <tr {% if row.shift_capped %}class="row-capped"{% endif %}>
                             <td><strong>{{ row.employee_id }}</strong></td>
+                            <td><strong>{{ row.employee_name if row.employee_name else '-' }}</strong></td>
                             <td>{{ row.designation if row.designation else '-' }}</td>
                             <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
                             <td>{{ row.day }}</td>

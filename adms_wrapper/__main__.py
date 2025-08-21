@@ -1,11 +1,15 @@
-import pandas as pd
 from datetime import timedelta
+from typing import Any
 
-from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users, get_user_shift_mappings
+import pandas as pd
+
+from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_user_shift_mappings, get_users
+
+NOON_HOUR = 12
+SUNDAY_WEEKDAY = 6
 
 
-# --- Data Extraction Functions ---
-def fetch_all_data():
+def fetch_all_data() -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Fetch all required data from the database using helper functions."""
     attendences = get_attendences() or []
     device_logs = get_device_logs() or []
@@ -15,8 +19,7 @@ def fetch_all_data():
     return attendences, device_logs, finger_logs, migration_logs, user_logs
 
 
-# --- Attendance Summary Processing ---
-def get_device_for_time(group, time_col, sn_col, which):
+def get_device_for_time(group: pd.DataFrame, time_col: str, sn_col: str, which: str) -> Any:
     """
     Helper function to get the device (sn) for the first or last timestamp in a group.
     Args:
@@ -31,80 +34,58 @@ def get_device_for_time(group, time_col, sn_col, which):
     return group.loc[idx, sn_col] if idx in group.index else None
 
 
-def process_attendance_summary(attendences):
-    """
-    Process the attendences data to create a summary DataFrame with:
-    - employee_id
-    - day
-    - start_time (first entry)
-    - end_time (last entry)
-    - start_sn (device for first entry)
-    - end_sn (device for last entry)
-    - time_spent (duration between first and last entry, formatted as HH:MM:SS)
-    - work_status (worked/absent)
-    - shift_capped (whether the work hours were capped by shift limits)
-
-    This function now includes all working days (excluding Sundays) for each employee,
-    showing both days they worked and days they were absent.
-    For employees with shifts, work hours are capped to their shift duration when they exceed it.
-    """
-    df_att = pd.DataFrame(attendences)
-    required_cols = {"employee_id", "timestamp", "sn"}
-    if not required_cols.issubset(df_att.columns):
-        print("Could not find 'employee_id', 'timestamp', or 'sn' columns in attendences data.")
-        return None
-
-    # Get shift mappings
+def get_shift_mappings() -> dict[str, dict[str, Any]]:
+    """Get shift mappings for all users."""
     shift_mappings = get_user_shift_mappings() or []
     shift_df = pd.DataFrame(shift_mappings)
     
-    # Create a dictionary for easy lookup of shift times
     shift_dict = {}
     if not shift_df.empty:
         for _, shift in shift_df.iterrows():
-            shift_dict[str(shift['user_id'])] = {
-                'shift_start': shift['shift_start'],
-                'shift_end': shift['shift_end'],
-                'shift_name': shift['shift_name']
+            shift_dict[str(shift["user_id"])] = {
+                "shift_start": shift["shift_start"],
+                "shift_end": shift["shift_end"],
+                "shift_name": shift["shift_name"]
             }
+    return shift_dict
 
-    # Convert timestamp to datetime for accurate calculations
-    df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
-    
-    # Process attendance entries with late checkout logic
+
+def process_late_checkout(employee_data: pd.DataFrame, entry: pd.Series, shift_dict: dict[str, dict[str, Any]]) -> Any:
+    """Process late checkout logic for an entry."""
+    timestamp = entry["timestamp"]
+    day = timestamp.date()
+    time_of_day = timestamp.time()
+    employee_id = entry["employee_id"]
+
+    if str(employee_id) in shift_dict:
+        shift_info = shift_dict[str(employee_id)]
+        shift_end = shift_info["shift_end"]
+
+        if isinstance(shift_end, pd.Timedelta):
+            total_seconds = int(shift_end.total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            shift_end = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
+
+        if time_of_day > shift_end and timestamp.hour < NOON_HOUR:
+            previous_day = timestamp.date() - timedelta(days=1)
+            prev_day_entries = employee_data[employee_data["timestamp"].dt.date == previous_day]
+
+            if not prev_day_entries.empty:
+                day = previous_day
+
+    return day
+
+
+def process_attendance_entries(df_att: pd.DataFrame, shift_dict: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Process attendance entries with late checkout logic."""
     processed_entries = []
-    
+
     for employee_id in df_att["employee_id"].unique():
         employee_data = df_att[df_att["employee_id"] == employee_id].sort_values("timestamp")
-        
+
         for _, entry in employee_data.iterrows():
-            timestamp = entry["timestamp"]
-            day = timestamp.date()
-            time_of_day = timestamp.time()
-            
-            # Check if this is a late checkout (after shift end but before noon)
-            if str(employee_id) in shift_dict:
-                shift_info = shift_dict[str(employee_id)]
-                shift_end = shift_info['shift_end']
-                
-                # Convert shift_end to time object if it's a Timedelta
-                if isinstance(shift_end, pd.Timedelta):
-                    total_seconds = int(shift_end.total_seconds())
-                    hours, remainder = divmod(total_seconds, 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    shift_end = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
-                
-                # If checkout is after shift end but before noon next day, assign to previous day
-                if time_of_day > shift_end and timestamp.hour < 12:
-                    # Check if this could be a late checkout from previous day
-                    previous_day = timestamp.date() - timedelta(days=1)
-                    
-                    # Look for entries from the previous day for this employee
-                    prev_day_entries = employee_data[employee_data["timestamp"].dt.date == previous_day]
-                    
-                    if not prev_day_entries.empty:
-                        # This is likely a late checkout, assign to previous day
-                        day = previous_day
+            day = process_late_checkout(employee_data, entry, shift_dict)
             
             processed_entries.append({
                 "employee_id": entry["employee_id"],
@@ -112,101 +93,59 @@ def process_attendance_summary(attendences):
                 "sn": entry["sn"],
                 "day": day
             })
-    
-    # Create DataFrame from processed entries
-    df_processed = pd.DataFrame(processed_entries)
-    
-    # Group by employee_id and day to get start/end times and devices for actual attendance
-    worked_summary = (
-        df_processed.groupby(["employee_id", "day"])
-        .apply(
-            lambda g: pd.Series(
-                {
-                    "start_time": g["timestamp"].min(),
-                    "end_time": g["timestamp"].max(),
-                    "start_device_sn": get_device_for_time(g, "timestamp", "sn", "min"),
-                    "end_device_sn": get_device_for_time(g, "timestamp", "sn", "max"),
-                    "work_status": "worked",
-                    "num_entries": len(g),  # Count number of entries for the day
-                }
-            )
-        )
-        .reset_index()
-    )
 
-    # Calculate time spent for worked days with improved logic for missing sign-outs and shift-based capping
-    def calculate_time_spent_and_flag(row):
-        start_time = row["start_time"]
-        end_time = row["end_time"]
-        num_entries = row["num_entries"]
-        day = row["day"]
-        employee_id = str(row["employee_id"])
-        
-        # Check if employee has a shift
-        has_shift = employee_id in shift_dict
-        shift_capped = False
-        
-        # If only one entry (sign-in but no sign-out), calculate time until end of day
-        if num_entries == 1:
-            # Set end time to end of the same day (23:59:59)
-            end_of_day = pd.Timestamp.combine(day, pd.Timestamp("23:59:59").time())
-            end_time = end_of_day
-        
-        # Apply shift capping logic if employee has a shift
-        if has_shift:
-            shift_info = shift_dict[employee_id]
-            shift_end_time = shift_info['shift_end']
-            
-            # Convert shift_end_time to time object if it's a Timedelta
-            if isinstance(shift_end_time, pd.Timedelta):
-                # Convert to total seconds and then to time
-                total_seconds = int(shift_end_time.total_seconds())
-                hours, remainder = divmod(total_seconds, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                shift_end_time = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
-            
-            # Convert shift times to datetime on the same day
-            shift_end_datetime = pd.Timestamp.combine(day, shift_end_time)
-            
-            # Check if this is a late checkout scenario (after shift end but before noon)
-            if end_time > shift_end_datetime:
-                if end_time.hour >= 12:  # If checkout is after noon, don't cap - it's next day cycle
-                    pass  # Keep original end_time
-                else:
-                    # This is a late checkout - don't cap, but mark it appropriately
-                    # The timer should NOT be reset here, keep the actual worked time
-                    pass  # Keep original end_time, don't cap
-        
-        # Calculate time difference
-        time_diff = end_time - start_time
-        
-        return str(time_diff).split(".")[0], shift_capped, end_time
+    return processed_entries
 
-    # Apply the function and extract results
-    time_results = worked_summary.apply(calculate_time_spent_and_flag, axis=1, result_type='expand')
-    worked_summary["time_spent"] = time_results[0]
-    worked_summary["shift_capped"] = time_results[1]
-    worked_summary["end_time"] = time_results[2]
 
-    # Drop the helper column
-    worked_summary = worked_summary.drop(columns=["num_entries"])
+def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str, Any]]) -> tuple[str, bool, pd.Timestamp]:
+    """Calculate time spent and shift flag for a work row."""
+    start_time = row["start_time"]
+    end_time = row["end_time"]
+    num_entries = row["num_entries"]
+    day = row["day"]
+    employee_id = str(row["employee_id"])
 
-    # If no attendance data, return empty DataFrame
+    has_shift = employee_id in shift_dict
+    shift_capped = False
+
+    if num_entries == 1:
+        end_of_day = pd.Timestamp.combine(day, pd.Timestamp("23:59:59").time())
+        end_time = end_of_day
+
+    if has_shift:
+        shift_info = shift_dict[employee_id]
+        shift_end_time = shift_info["shift_end"]
+
+        if isinstance(shift_end_time, pd.Timedelta):
+            total_seconds = int(shift_end_time.total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            shift_end_time = pd.Timestamp(f"{hours:02d}:{minutes:02d}:{seconds:02d}").time()
+
+        shift_end_datetime = pd.Timestamp.combine(day, shift_end_time)
+
+        if end_time > shift_end_datetime:
+            if end_time.hour >= NOON_HOUR:
+                pass
+            else:
+                pass
+
+    time_diff = end_time - start_time
+    return str(time_diff).split(".")[0], shift_capped, end_time
+
+
+def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, Any]]:
+    """Generate complete attendance records including absent days."""
     if worked_summary.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return []
 
-    # Get all unique employees
     unique_employees = worked_summary["employee_id"].unique()
-
-    # Get date range from the data
     min_date = worked_summary["day"].min()
     max_date = worked_summary["day"].max()
 
-    # Generate all working days (excluding Sundays) in the date range
     date_range = pd.date_range(start=min_date, end=max_date, freq="D")
-    working_days = [d.date() for d in date_range if d.weekday() != 6]  # 6 = Sunday
+    working_days = [d.date() for d in date_range if d.weekday() != SUNDAY_WEEKDAY]
 
-    # Create a complete attendance record for all employees and all working days
     complete_records = []
 
     for employee_id in unique_employees:
@@ -214,11 +153,12 @@ def process_attendance_summary(attendences):
 
         for day in working_days:
             if day in employee_worked_days:
-                # Employee worked this day - get the actual record
-                work_record = worked_summary[(worked_summary["employee_id"] == employee_id) & (worked_summary["day"] == day)].iloc[0].to_dict()
+                work_record = worked_summary[
+                    (worked_summary["employee_id"] == employee_id) &
+                    (worked_summary["day"] == day)
+                ].iloc[0].to_dict()
                 complete_records.append(work_record)
             else:
-                # Employee was absent this day - create absent record
                 absent_record = {
                     "employee_id": employee_id,
                     "day": day,
@@ -232,20 +172,96 @@ def process_attendance_summary(attendences):
                 }
                 complete_records.append(absent_record)
 
-    # Create the final summary DataFrame
-    summary = pd.DataFrame(complete_records)
+    return complete_records
 
-    # Sort by employee_id and day
-    summary = summary.sort_values(["employee_id", "day"]).reset_index(drop=True)
+
+def process_attendance_summary(attendences: list[dict[str, Any]]) -> pd.DataFrame:
+    """
+    Process the attendences data to create a summary DataFrame.
+    """
+    df_att = pd.DataFrame(attendences)
+    required_cols = {"employee_id", "timestamp", "sn"}
+    if not required_cols.issubset(df_att.columns):
+        return pd.DataFrame(columns=[
+            "employee_id", "day", "start_time", "end_time",
+            "start_device_sn", "end_device_sn", "time_spent",
+            "work_status", "shift_capped"
+        ])
+
+    if df_att.empty:
+        return pd.DataFrame(columns=[
+            "employee_id", "day", "start_time", "end_time",
+            "start_device_sn", "end_device_sn", "time_spent",
+            "work_status", "shift_capped"
+        ])
+
+    shift_dict = get_shift_mappings()
+    df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
+    
+    processed_entries = process_attendance_entries(df_att, shift_dict)
+    if not processed_entries:
+        return pd.DataFrame(columns=[
+            "employee_id", "day", "start_time", "end_time",
+            "start_device_sn", "end_device_sn", "time_spent",
+            "work_status", "shift_capped"
+        ])
+    
+    df_processed = pd.DataFrame(processed_entries)
+
+    worked_summary = (
+        df_processed.groupby(["employee_id", "day"])
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "start_time": g["timestamp"].min(),
+                    "end_time": g["timestamp"].max(),
+                    "start_device_sn": get_device_for_time(g, "timestamp", "sn", "min"),
+                    "end_device_sn": get_device_for_time(g, "timestamp", "sn", "max"),
+                    "work_status": "worked",
+                    "num_entries": len(g),
+                }
+            ),
+            include_groups=False
+        )
+        .reset_index()
+    )
+
+    if worked_summary.empty:
+        return pd.DataFrame(columns=[
+            "employee_id", "day", "start_time", "end_time",
+            "start_device_sn", "end_device_sn", "time_spent",
+            "work_status", "shift_capped"
+        ])
+
+    time_results = worked_summary.apply(
+        lambda row: calculate_time_spent_and_flag(row, shift_dict),
+        axis=1,
+        result_type="expand"
+    )
+    
+    worked_summary["time_spent"] = time_results[0]
+    worked_summary["shift_capped"] = time_results[1]
+    worked_summary["end_time"] = time_results[2]
+    worked_summary = worked_summary.drop(columns=["num_entries"])
+
+    complete_records = generate_complete_records(worked_summary)
+    summary = pd.DataFrame(complete_records)
+    
+    if not summary.empty and "employee_id" in summary.columns and "day" in summary.columns:
+        summary = summary.sort_values(["employee_id", "day"]).reset_index(drop=True)
 
     return summary
 
 
-# --- Excel Export Function ---
-def export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, attendance_summary):
-    """
-    Export all data and the attendance summary to an Excel file with separate sheets.
-    """
+def export_to_excel(
+    attendences: list[dict[str, Any]],
+    device_logs: list[dict[str, Any]],
+    finger_logs: list[dict[str, Any]],
+    migration_logs: list[dict[str, Any]],
+    user_logs: list[dict[str, Any]],
+    attendance_summary: pd.DataFrame
+) -> None:
+    """Export all data and the attendance summary to an Excel file with separate sheets."""
     with pd.ExcelWriter("output.xlsx", engine="openpyxl") as writer:
         pd.DataFrame(attendences).to_excel(writer, sheet_name="Attendences", index=False)
         pd.DataFrame(device_logs).to_excel(writer, sheet_name="DeviceLogs", index=False)
@@ -256,14 +272,13 @@ def export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_
             attendance_summary.to_excel(writer, sheet_name="AttendanceSummary", index=False)
 
 
-# --- Main Execution ---
-def main(start_date: str = None, end_date: str = None):
+def main(start_date: str | None = None, end_date: str | None = None) -> str:
     """
     Main function to orchestrate data fetching, processing, and exporting.
     Optionally filters attendences by a date range.
     """
     attendences, device_logs, finger_logs, migration_logs, user_logs = fetch_all_data()
-    # Filter attendences by date range if provided
+    
     if start_date or end_date:
         df = pd.DataFrame(attendences)
         if "timestamp" in df.columns:
@@ -273,6 +288,7 @@ def main(start_date: str = None, end_date: str = None):
             if end_date:
                 df = df[df["timestamp"] <= pd.to_datetime(end_date)]
             attendences = df.to_dict(orient="records")
+    
     attendance_summary = process_attendance_summary(attendences)
     export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, attendance_summary)
     return "Data exported to output.xlsx"

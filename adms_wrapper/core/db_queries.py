@@ -174,3 +174,41 @@ def delete_employee_designation_mapping(employee_id: str) -> list:
     """Delete an employee ID to designation mapping."""
     query = "DELETE FROM employee_designation_mapping WHERE employee_id = %s"
     return query_db(query, (employee_id,))
+
+
+# --- Employee ID to Name Mapping ---
+
+
+def create_employee_name_mapping_table() -> None:
+    """Create the employee name mapping table if it does not exist, with unique employee_id."""
+    query = """
+    CREATE TABLE IF NOT EXISTS employee_name_mapping (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id VARCHAR(255) NOT NULL UNIQUE,
+        employee_name VARCHAR(255) NOT NULL
+    )
+    """
+    query_db(query)
+
+
+def get_employee_name_mappings() -> list:
+    """Get all employee ID to name mappings."""
+    create_employee_name_mapping_table()
+    return query_db("SELECT employee_id, employee_name FROM employee_name_mapping")
+
+
+def add_employee_name_mapping(employee_id: str, employee_name: str) -> list:
+    """Add or update an employee ID to name mapping. Creates the table if it does not exist."""
+    create_employee_name_mapping_table()
+    query = """
+    INSERT INTO employee_name_mapping (employee_id, employee_name)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE employee_name = VALUES(employee_name)
+    """
+    return query_db(query, (employee_id, employee_name))
+
+
+def delete_employee_name_mapping(employee_id: str) -> list:
+    """Delete an employee ID to name mapping."""
+    query = "DELETE FROM employee_name_mapping WHERE employee_id = %s"
+    return query_db(query, (employee_id,))
