@@ -67,16 +67,35 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
     """Determine shift flag based on times."""
     flag = "on time"
     try:
-        if pd.notna(start_time) and str(start_time) != "" and str(start_time)[11:16] > str(shift_start):
+        # Check for late check-in - now includes exact shift start time as late
+        if pd.notna(start_time) and str(start_time) != "" and str(start_time)[11:16] >= str(shift_start):
             flag = "late in"
 
         if pd.notna(end_time) and str(end_time) != "":
             end_time_hour = end_time.hour if hasattr(end_time, "hour") else int(str(end_time)[11:13])
             end_time_str = str(end_time)[11:16]
 
-            if end_time_str > str(shift_end) and end_time_hour < NOON_HOUR:
+            # Check for late checkout - now includes exact shift end time as late
+            if end_time_str >= str(shift_end) and end_time_hour < NOON_HOUR:
                 flag = "late checkout"
             elif end_time_str < str(shift_end):
+                flag = "early out"
+    except Exception:
+        pass
+    return flag
+
+
+def determine_no_shift_flag(end_time: Any) -> str:
+    """Determine shift flag for employees with no shift assignment."""
+    flag = "on time"
+    try:
+        if pd.notna(end_time) and str(end_time) != "":
+            end_time_str = str(end_time)[11:16]
+
+            # Check if checkout is exactly at 12:00 or later
+            if end_time_str >= "12:00":
+                flag = "late checkout"
+            elif end_time_str < "12:00":
                 flag = "early out"
     except Exception:
         pass
@@ -86,11 +105,19 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
 def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, end_time: Any, shift_df: pd.DataFrame) -> tuple[str, str]:
     """Get shift information for an employee without shift_capped parameter."""
     if shift_df.empty:
-        return "", "no shift"
+        # No shift data available - use no-shift logic
+        if work_status == "absent":
+            return "", "absent"
+        flag = determine_no_shift_flag(end_time)
+        return "", flag
 
     shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
     if shift_row.empty:
-        return "", "no shift"
+        # Employee has no assigned shift - use no-shift logic
+        if work_status == "absent":
+            return "", "absent"
+        flag = determine_no_shift_flag(end_time)
+        return "", flag
 
     shift_name = shift_row.iloc[0]["shift_name"]
     shift_start = shift_row.iloc[0]["shift_start"]

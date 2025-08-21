@@ -459,7 +459,7 @@
                             <td>{{ row.start_time.strftime('%H:%M') if row.start_time else '-' }}</td>
                             <td>
                                 {% if row.shift_flag == "late checkout" %}
-                                    <span class="time-late-checkout" title="Late checkout - past shift end">{{ row.end_time.strftime('%H:%M') }} 🕐</span>
+                                    <span class="time-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">{{ row.end_time.strftime('%H:%M') }} 🕐</span>
                                 {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
                                     <span class="time-auto" title="Auto-calculated end time">{{ row.end_time.strftime('%H:%M') }} ⏰</span>
                                 {% else %}
@@ -468,7 +468,7 @@
                             </td>
                             <td>
                                 {% if row.shift_flag == "late checkout" %}
-                                    <span class="time-late-checkout" title="Actual time worked including late checkout">{{ row.time_spent }} 🔄</span>
+                                    <span class="time-late-checkout" title="Actual time worked including late checkout (at or past shift end/12:00)">{{ row.time_spent }} 🔄</span>
                                 {% elif row.shift_capped %}
                                     <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
                                 {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
@@ -487,9 +487,9 @@
                             </td>
                             <td>
                                 {% if row.shift_flag == "late checkout" %}
-                                    <span class="status-badge status-late-checkout">LATE CHECKOUT</span>
+                                    <span class="status-badge status-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">LATE CHECKOUT</span>
                                 {% elif row.shift_flag == "late in" %}
-                                    <span class="status-badge status-late-in">LATE IN</span>
+                                    <span class="status-badge status-late-in" title="Late check-in - at or after shift start time">LATE IN</span>
                                 {% elif row.shift_flag == "early out" %}
                                     <span class="status-badge status-early-out">EARLY OUT</span>
                                 {% elif row.shift_capped %}

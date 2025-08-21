@@ -135,42 +135,15 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
 
 
 def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, Any]]:
-    """Generate complete attendance records including absent days."""
+    """Generate attendance records only for days when employees actually came in."""
     if worked_summary.empty:
         return []
 
-    unique_employees = worked_summary["employee_id"].unique()
-    min_date = worked_summary["day"].min()
-    max_date = worked_summary["day"].max()
-
-    date_range = pd.date_range(start=min_date, end=max_date, freq="D")
-    working_days = [d.date() for d in date_range if d.weekday() != SUNDAY_WEEKDAY]
-
     complete_records = []
 
-    for employee_id in unique_employees:
-        employee_worked_days = set(worked_summary[worked_summary["employee_id"] == employee_id]["day"])
-
-        for day in working_days:
-            if day in employee_worked_days:
-                work_record = worked_summary[
-                    (worked_summary["employee_id"] == employee_id) &
-                    (worked_summary["day"] == day)
-                ].iloc[0].to_dict()
-                complete_records.append(work_record)
-            else:
-                absent_record = {
-                    "employee_id": employee_id,
-                    "day": day,
-                    "start_time": None,
-                    "end_time": None,
-                    "start_device_sn": None,
-                    "end_device_sn": None,
-                    "time_spent": "0:00:00",
-                    "work_status": "absent",
-                    "shift_capped": False,
-                }
-                complete_records.append(absent_record)
+    # Only include records where employees actually worked (no absent days)
+    for _, row in worked_summary.iterrows():
+        complete_records.append(row.to_dict())
 
     return complete_records
 
