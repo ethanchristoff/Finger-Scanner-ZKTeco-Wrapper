@@ -3,7 +3,7 @@ from typing import Any
 
 import pandas as pd
 
-from .db_queries import get_user_shift_mappings
+from .db_queries import get_user_shift_mappings, get_comprehensive_employee_data
 
 NOON_HOUR = 12
 SUNDAY_WEEKDAY = 6
@@ -141,24 +141,76 @@ def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, An
     return complete_records
 
 
-def process_attendance_summary(attendences: list[dict[str, Any]]) -> pd.DataFrame:
+def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[dict[str, Any]]:
+    """Generate absent day records for all known employees within a specific date range."""
+    # Get all known employees from the system
+    all_employees = get_comprehensive_employee_data() or []
+    
+    if not all_employees:
+        return []
+    
+    # Parse date range
+    start_pd = pd.to_datetime(start_date).date()
+    end_pd = pd.to_datetime(end_date).date()
+    all_days = pd.date_range(start=start_pd, end=end_pd, freq="D").date
+    
+    absent_records = []
+    
+    for employee in all_employees:
+        employee_id = employee.get("employee_id", "")
+        if not employee_id:
+            continue
+            
+        for day in all_days:
+            absent_records.append(
+                {
+                    "employee_id": employee_id,
+                    "day": day,
+                    "start_time": pd.NaT,
+                    "end_time": pd.NaT,
+                    "start_device_sn": "",
+                    "end_device_sn": "",
+                    "time_spent": "0:00:00",
+                    "work_status": "absent",
+                    "shift_capped": False,
+                }
+            )
+    
+    return absent_records
+
+
+def _get_absent_days_fallback(start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """Get absent days as fallback when no attendance data is found."""
+    if start_date and end_date:
+        absent_records = generate_absent_days_for_date_range(start_date, end_date)
+        if absent_records:
+            return pd.DataFrame(absent_records)
+    return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+
+
+def process_attendance_summary(attendences: list[dict[str, Any]], start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
     """
     Process the attendences data to create a summary DataFrame.
+    If start_date and end_date are provided and no attendance data exists,
+    generate absent day records for all known employees in that date range.
     """
     df_att = pd.DataFrame(attendences)
     required_cols = {"employee_id", "timestamp", "sn"}
+    
+    # Check if data has required columns
     if not required_cols.issubset(df_att.columns):
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return _get_absent_days_fallback(start_date, end_date)
 
+    # Check if data is empty
     if df_att.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return _get_absent_days_fallback(start_date, end_date)
 
     shift_dict = get_shift_mappings()
     df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
 
     processed_entries = process_attendance_entries(df_att, shift_dict)
     if not processed_entries:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return _get_absent_days_fallback(start_date, end_date)
 
     df_processed = pd.DataFrame(processed_entries)
 
@@ -181,7 +233,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]]) -> pd.DataFram
     )
 
     if worked_summary.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return _get_absent_days_fallback(start_date, end_date)
 
     time_results = worked_summary.apply(lambda row: calculate_time_spent_and_flag(row, shift_dict), axis=1, result_type="expand")
 

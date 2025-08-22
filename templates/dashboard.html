@@ -444,14 +444,14 @@
                             <td>{{ row.designation if row.designation else '-' }}</td>
                             <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
                             <td>{{ row.day }}</td>
-                            <td>{{ row.start_time.strftime('%H:%M') if row.start_time else '-' }}</td>
+                            <td>{{ row.start_time[:5] if row.start_time else '-' }}</td>
                             <td>
                                 {% if row.shift_flag == "late checkout" %}
-                                    <span class="time-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">{{ row.end_time.strftime('%H:%M') }} 🕐</span>
-                                {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
-                                    <span class="time-auto" title="Auto-calculated end time">{{ row.end_time.strftime('%H:%M') }} ⏰</span>
+                                    <span class="time-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">{{ row.end_time[:5] if row.end_time else '-' }} 🕐</span>
+                                {% elif row.end_time and row.end_time == '23:59:59' %}
+                                    <span class="time-auto" title="Auto-calculated end time">{{ row.end_time[:5] if row.end_time else '-' }} ⏰</span>
                                 {% else %}
-                                    {{ row.end_time.strftime('%H:%M') if row.end_time else '-' }}
+                                    {{ row.end_time[:5] if row.end_time else '-' }}
                                 {% endif %}
                             </td>
                             <td>
@@ -459,7 +459,7 @@
                                     <span class="time-late-checkout" title="Actual time worked including late checkout (at or past shift end/12:00)">{{ row.time_spent }} 🔄</span>
                                 {% elif row.shift_capped %}
                                     <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
-                                {% elif row.end_time and row.end_time.strftime('%H:%M:%S') == '23:59:59' %}
+                                {% elif row.end_time and row.end_time == '23:59:59' %}
                                     <span class="time-auto" title="Calculated until end of day">{{ row.time_spent }}</span>
                                 {% else %}
                                     {{ row.time_spent }}

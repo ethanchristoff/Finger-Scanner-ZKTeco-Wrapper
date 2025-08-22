@@ -195,14 +195,50 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
     return summary_df
 
 
+def clean_attendance_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
+    """Clean attendance summary by removing unwanted columns and formatting times."""
+    if summary_df.empty:
+        return summary_df
+    
+    # Format start_time and end_time to show only time (not date)
+    if "start_time" in summary_df.columns:
+        summary_df["start_time"] = summary_df["start_time"].apply(
+            lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, 'strftime') else ""
+        )
+    
+    if "end_time" in summary_df.columns:
+        summary_df["end_time"] = summary_df["end_time"].apply(
+            lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, 'strftime') else ""
+        )
+    
+    # Remove unwanted columns
+    columns_to_remove = [
+        "start_device_sn", 
+        "end_device_sn", 
+        "shift_capped", 
+        "start_device_sn_branch", 
+        "end_device_sn_branch", 
+        "designation", 
+        "employee_branch"
+    ]
+    
+    for col in columns_to_remove:
+        if col in summary_df.columns:
+            summary_df = summary_df.drop(columns=[col])
+    
+    return summary_df
+
+
 def create_subtotal_rows(summary_df: pd.DataFrame) -> list[dict[str, Any]]:
-    """Create subtotal rows for each employee."""
+    """Create subtotal rows for each employee with separate days worked and total hours columns."""
     output_rows = []
 
     for emp_id, group in summary_df.groupby("employee_id", sort=False):
         output_rows.extend(group.to_dict(orient="records"))
 
         worked_group = group[group["work_status"] == "worked"].copy()
+        days_worked = len(worked_group)
+        
         if not worked_group.empty:
             worked_group.loc[:, "time_spent_td"] = pd.to_timedelta(worked_group["time_spent"])
             subtotal = worked_group["time_spent_td"].sum()
@@ -213,9 +249,10 @@ def create_subtotal_rows(summary_df: pd.DataFrame) -> list[dict[str, Any]]:
         subtotal_row = dict.fromkeys(summary_df.columns, "")
         subtotal_row["employee_id"] = emp_id
         if not group.empty:
-            subtotal_row["designation"] = group.iloc[0]["designation"]
+            subtotal_row["employee_name"] = group.iloc[0].get("employee_name", "")
         subtotal_row["day"] = "Subtotal"
-        subtotal_row["time_spent"] = subtotal_str
+        subtotal_row["days_worked"] = days_worked
+        subtotal_row["total_hours"] = subtotal_str
         subtotal_row["work_status"] = "subtotal"
         output_rows.append(subtotal_row)
 
@@ -229,9 +266,11 @@ def generate_attendance_summary(
     _migration_logs: list[dict[str, Any]],
     _user_logs: list[dict[str, Any]],
     shift_mappings: list[dict[str, Any]] | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> pd.DataFrame:
     """Generate attendance summary with all mappings applied."""
-    summary_df = process_attendance_summary(attendences)
+    summary_df = process_attendance_summary(attendences, start_date, end_date)
 
     if summary_df is not None and not summary_df.empty:
         summary_df = apply_branch_mappings(summary_df)
@@ -240,8 +279,11 @@ def generate_attendance_summary(
         summary_df = apply_employee_name_mappings(summary_df)
         summary_df = apply_shift_mappings(summary_df, shift_mappings)
 
+        # Clean the summary before creating subtotal rows
+        summary_df = clean_attendance_summary(summary_df)
+
         output_rows = create_subtotal_rows(summary_df)
-        merged = pd.DataFrame(output_rows, columns=summary_df.columns)
+        merged = pd.DataFrame(output_rows, columns=[*summary_df.columns.tolist(), "days_worked", "total_hours"])
     else:
         merged = summary_df if summary_df is not None else pd.DataFrame()
 
@@ -352,8 +394,6 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
         summary_row = {
             "employee_id": emp_id,
             "employee_name": first_row.get("employee_name", ""),
-            "designation": first_row.get("designation", ""),
-            "employee_branch": first_row.get("employee_branch", ""),
             "shift_name": shift_name,
             "total_days": total_days,
             "days_worked": worked_days,

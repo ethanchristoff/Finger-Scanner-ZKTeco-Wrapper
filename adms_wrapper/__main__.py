@@ -243,6 +243,6 @@ def main(start_date: str | None = None, end_date: str | None = None) -> str:
                 df = df[df["timestamp"] <= end_datetime]
             attendences = df.to_dict(orient="records")
 
-    attendance_summary = process_attendance_summary(attendences)
+    attendance_summary = process_attendance_summary(attendences, start_date, end_date)
     export_to_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, attendance_summary)
     return "Data exported to output.xlsx"

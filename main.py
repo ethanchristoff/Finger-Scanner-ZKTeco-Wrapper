@@ -1,8 +1,11 @@
-from fastapi import APIRouter, FastAPI, Query
 from typing import Optional
-from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
-from adms_wrapper.__main__ import process_attendance_summary, main
+
 import pandas as pd
+from fastapi import APIRouter, FastAPI, Query
+
+from adms_wrapper.__main__ import main
+from adms_wrapper.core.data_processing import process_attendance_summary
+from adms_wrapper.core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_users
 
 router = APIRouter()
 
@@ -70,7 +73,7 @@ def attendance_summary(start_date: Optional[str] = Query(None, description="Star
                 end_datetime = pd.to_datetime(end_date).replace(hour=23, minute=59, second=59, microsecond=999999)
                 df = df[df["timestamp"] <= end_datetime]
             attendences = df.to_dict(orient="records")
-    summary_df = process_attendance_summary(attendences)
+    summary_df = process_attendance_summary(attendences, start_date, end_date)
     if summary_df is not None:
         return summary_df.to_dict(orient="records")
     return []

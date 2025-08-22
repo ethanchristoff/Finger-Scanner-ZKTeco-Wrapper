@@ -4,7 +4,7 @@ from typing import Any
 import pandas as pd
 from flask import Flask, flash, redirect, render_template, request, send_file, url_for
 
-from adms_wrapper.__main__ import process_attendance_summary
+from adms_wrapper.core.data_processing import process_attendance_summary
 from adms_wrapper.core.db_queries import (
     add_comprehensive_employee,
     add_device_branch_mapping,
@@ -475,9 +475,9 @@ def apply_filters(
     return df.to_dict(orient="records")
 
 
-def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings: list[dict[str, Any]], start_date: str | None = None, end_date: str | None = None) -> list[dict[str, Any]]:
     """Prepare summary data for dashboard."""
-    summary_df = process_attendance_summary(attendences)
+    summary_df = process_attendance_summary(attendences, start_date, end_date)
     if summary_df is None or summary_df.empty:
         return []
 
@@ -486,7 +486,7 @@ def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings:
     migration_logs = get_migrations() or []
     user_logs = get_users() or []
 
-    full_summary_df = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings)
+    full_summary_df = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings, start_date, end_date)
 
     if full_summary_df.empty or "work_status" not in full_summary_df.columns:
         return []
@@ -529,7 +529,7 @@ def index() -> Any:
     attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch, employee_name, designation)
 
     shift_mappings = get_user_shift_mappings() or []
-    summary = prepare_dashboard_summary(attendences, shift_mappings)
+    summary = prepare_dashboard_summary(attendences, shift_mappings, start_date, end_date)
     add_branch_info_to_summary(summary)
     add_employee_name_to_summary(summary)
 
@@ -599,7 +599,7 @@ def download_xlsx() -> Any:
     migration_logs = get_migrations() or []
     user_logs = get_users() or []
     shift_mappings = get_user_shift_mappings() or []
-    merged = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings)
+    merged = generate_attendance_summary(attendences, device_logs, finger_logs, migration_logs, user_logs, shift_mappings, start_date, end_date)
     new_output = write_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, merged)
 
     return send_file(new_output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
