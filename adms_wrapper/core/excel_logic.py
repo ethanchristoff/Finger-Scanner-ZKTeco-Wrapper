@@ -211,14 +211,12 @@ def clean_attendance_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
             lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, 'strftime') else ""
         )
     
-    # Remove unwanted columns
+    # Remove unwanted columns (keeping start_device_sn_branch and end_device_sn_branch)
     columns_to_remove = [
-        "start_device_sn", 
-        "end_device_sn", 
-        "shift_capped", 
-        "start_device_sn_branch", 
-        "end_device_sn_branch", 
-        "designation", 
+        "start_device_sn",
+        "end_device_sn",
+        "shift_capped",
+        "designation",
         "employee_branch"
     ]
     
