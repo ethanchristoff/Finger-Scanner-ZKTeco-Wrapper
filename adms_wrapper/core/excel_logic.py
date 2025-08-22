@@ -199,31 +199,21 @@ def clean_attendance_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
     """Clean attendance summary by removing unwanted columns and formatting times."""
     if summary_df.empty:
         return summary_df
-    
+
     # Format start_time and end_time to show only time (not date)
     if "start_time" in summary_df.columns:
-        summary_df["start_time"] = summary_df["start_time"].apply(
-            lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, 'strftime') else ""
-        )
-    
+        summary_df["start_time"] = summary_df["start_time"].apply(lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, "strftime") else "")
+
     if "end_time" in summary_df.columns:
-        summary_df["end_time"] = summary_df["end_time"].apply(
-            lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, 'strftime') else ""
-        )
-    
+        summary_df["end_time"] = summary_df["end_time"].apply(lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, "strftime") else "")
+
     # Remove unwanted columns (keeping start_device_sn_branch and end_device_sn_branch)
-    columns_to_remove = [
-        "start_device_sn",
-        "end_device_sn",
-        "shift_capped",
-        "designation",
-        "employee_branch"
-    ]
-    
+    columns_to_remove = ["start_device_sn", "end_device_sn", "shift_capped", "designation", "employee_branch"]
+
     for col in columns_to_remove:
         if col in summary_df.columns:
             summary_df = summary_df.drop(columns=[col])
-    
+
     return summary_df
 
 
@@ -236,7 +226,7 @@ def create_subtotal_rows(summary_df: pd.DataFrame) -> list[dict[str, Any]]:
 
         worked_group = group[group["work_status"] == "worked"].copy()
         days_worked = len(worked_group)
-        
+
         if not worked_group.empty:
             worked_group.loc[:, "time_spent_td"] = pd.to_timedelta(worked_group["time_spent"])
             subtotal = worked_group["time_spent_td"].sum()

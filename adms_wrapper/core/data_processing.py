@@ -105,17 +105,41 @@ def process_attendance_entries(df_att: pd.DataFrame, shift_dict: dict[str, dict[
     return processed
 
 
-def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, Any]]:
-    """Generate complete records including absent days."""
+def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | None = None, end_date: str | None = None) -> list[dict[str, Any]]:
+    """Generate complete records including absent days for the full date range."""
     if worked_summary.empty:
+        # If no worked data but we have date range, generate all absent days
+        if start_date and end_date:
+            return generate_absent_days_for_date_range(start_date, end_date)
         return []
 
-    all_days = pd.date_range(start=worked_summary["day"].min(), end=worked_summary["day"].max(), freq="D").date
+    # Determine the date range - use provided dates or default to worked data range
+    if start_date and end_date:
+        start_pd = pd.to_datetime(start_date).date()
+        end_pd = pd.to_datetime(end_date).date()
+        all_days = pd.date_range(start=start_pd, end=end_pd, freq="D").date
+    else:
+        # Fallback to the range of worked data
+        all_days = pd.date_range(start=worked_summary["day"].min(), end=worked_summary["day"].max(), freq="D").date
 
-    all_employees = worked_summary["employee_id"].unique()
+    # Get all employees from worked data and comprehensive employee data
+    worked_employees = set(worked_summary["employee_id"].unique())
+
+    # Also include all known employees if we have a date range filter
+    all_known_employees = set()
+    if start_date and end_date:
+        comprehensive_employees = get_comprehensive_employee_data() or []
+        all_known_employees = {emp.get("employee_id", "") for emp in comprehensive_employees if emp.get("employee_id")}
+
+    # Combine both sets to ensure we include all relevant employees
+    all_employees = worked_employees.union(all_known_employees) if all_known_employees else worked_employees
+
     complete_records = []
 
     for employee_id in all_employees:
+        if not employee_id:  # Skip empty employee IDs
+            continue
+
         employee_data = worked_summary[worked_summary["employee_id"] == employee_id]
 
         for day in all_days:
@@ -145,22 +169,22 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
     """Generate absent day records for all known employees within a specific date range."""
     # Get all known employees from the system
     all_employees = get_comprehensive_employee_data() or []
-    
+
     if not all_employees:
         return []
-    
+
     # Parse date range
     start_pd = pd.to_datetime(start_date).date()
     end_pd = pd.to_datetime(end_date).date()
     all_days = pd.date_range(start=start_pd, end=end_pd, freq="D").date
-    
+
     absent_records = []
-    
+
     for employee in all_employees:
         employee_id = employee.get("employee_id", "")
         if not employee_id:
             continue
-            
+
         for day in all_days:
             absent_records.append(
                 {
@@ -175,7 +199,7 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
                     "shift_capped": False,
                 }
             )
-    
+
     return absent_records
 
 
@@ -196,7 +220,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
     """
     df_att = pd.DataFrame(attendences)
     required_cols = {"employee_id", "timestamp", "sn"}
-    
+
     # Check if data has required columns
     if not required_cols.issubset(df_att.columns):
         return _get_absent_days_fallback(start_date, end_date)
@@ -242,7 +266,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
     worked_summary["end_time"] = time_results[2]
     worked_summary = worked_summary.drop(columns=["num_entries"])
 
-    complete_records = generate_complete_records(worked_summary)
+    complete_records = generate_complete_records(worked_summary, start_date, end_date)
     summary = pd.DataFrame(complete_records)
 
     if not summary.empty and "employee_id" in summary.columns and "day" in summary.columns:

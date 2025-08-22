@@ -13,7 +13,6 @@ from adms_wrapper.core.db_queries import (
     add_employee_name_mapping,
     add_shift_template,
     add_user_shift_mapping,
-    assign_shift_template_to_user,
     delete_comprehensive_employee,
     delete_device_branch_mapping,
     delete_employee_branch_mapping,
