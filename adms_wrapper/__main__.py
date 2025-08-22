@@ -4,6 +4,7 @@ from typing import Any
 import pandas as pd
 
 from .core.db_queries import get_attendences, get_device_logs, get_finger_log, get_migrations, get_user_shift_mappings, get_users
+from .core.excel_logic import create_employee_summary_sheet
 
 NOON_HOUR = 12
 SUNDAY_WEEKDAY = 6
@@ -206,6 +207,9 @@ def export_to_excel(
     attendance_summary: pd.DataFrame,
 ) -> None:
     """Export all data and the attendance summary to an Excel file with separate sheets."""
+    # Generate employee summary sheet
+    employee_summary = create_employee_summary_sheet(attendance_summary) if attendance_summary is not None else pd.DataFrame()
+
     with pd.ExcelWriter("output.xlsx", engine="openpyxl") as writer:
         pd.DataFrame(attendences).to_excel(writer, sheet_name="Attendences", index=False)
         pd.DataFrame(device_logs).to_excel(writer, sheet_name="DeviceLogs", index=False)
@@ -214,6 +218,8 @@ def export_to_excel(
         pd.DataFrame(user_logs).to_excel(writer, sheet_name="Users", index=False)
         if attendance_summary is not None:
             attendance_summary.to_excel(writer, sheet_name="AttendanceSummary", index=False)
+        if not employee_summary.empty:
+            employee_summary.to_excel(writer, sheet_name="EmployeeSummary", index=False)
 
 
 def main(start_date: str | None = None, end_date: str | None = None) -> str:

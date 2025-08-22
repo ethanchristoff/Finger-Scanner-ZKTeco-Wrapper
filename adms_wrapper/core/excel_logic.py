@@ -5,7 +5,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-from adms_wrapper.__main__ import process_attendance_summary
+from adms_wrapper.core.data_processing import process_attendance_summary
 from adms_wrapper.core.db_queries import (
     get_device_branch_mappings,
     get_employee_branch_mappings,
@@ -305,11 +305,86 @@ def apply_row_highlighting(ws: Any) -> None:
         apply_status_highlighting(row, work_status_col, shift_capped_col, green_fill, red_fill, yellow_fill)
 
 
+def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
+    """Create a comprehensive summary sheet with employee statistics including days worked, subtotal hours, etc."""
+    if summary_df.empty:
+        return pd.DataFrame()
+
+    summary_rows = []
+
+    for emp_id, group in summary_df.groupby("employee_id", sort=False):
+        # Get employee info from the first row of the group
+        first_row = group.iloc[0]
+
+        # Calculate statistics
+        total_days = len(group)
+        worked_days = len(group[group["work_status"] == "worked"])
+        absent_days = len(group[group["work_status"] == "absent"])
+
+        # Calculate total worked hours
+        worked_group = group[group["work_status"] == "worked"].copy()
+        if not worked_group.empty:
+            worked_group.loc[:, "time_spent_td"] = pd.to_timedelta(worked_group["time_spent"])
+            subtotal = worked_group["time_spent_td"].sum()
+            subtotal_str = str(subtotal).split(".")[0]
+
+            # Calculate average hours per worked day
+            avg_hours_per_day = subtotal / worked_days if worked_days > 0 else pd.Timedelta(0)
+            avg_hours_str = str(avg_hours_per_day).split(".")[0]
+        else:
+            subtotal_str = "0:00:00"
+            avg_hours_str = "0:00:00"
+
+        # Get shift information
+        shift_name = first_row.get("shift_name", "")
+
+        # Count different shift flags
+        late_in_count = len(group[group["shift_flag"] == "late in"])
+        early_out_count = len(group[group["shift_flag"] == "early out"])
+        late_checkout_count = len(group[group["shift_flag"] == "late checkout"])
+        on_time_count = len(group[group["shift_flag"] == "on time"])
+        shift_capped_count = len(group[group["shift_flag"] == "shift_capped"])
+
+        # Calculate attendance percentage
+        attendance_percentage = (worked_days / total_days * 100) if total_days > 0 else 0
+
+        # Create summary row
+        summary_row = {
+            "employee_id": emp_id,
+            "employee_name": first_row.get("employee_name", ""),
+            "designation": first_row.get("designation", ""),
+            "employee_branch": first_row.get("employee_branch", ""),
+            "shift_name": shift_name,
+            "total_days": total_days,
+            "days_worked": worked_days,
+            "days_absent": absent_days,
+            "attendance_percentage": f"{attendance_percentage:.1f}%",
+            "total_hours_worked": subtotal_str,
+            "avg_hours_per_day": avg_hours_str,
+            "on_time_days": on_time_count,
+            "late_in_days": late_in_count,
+            "early_out_days": early_out_count,
+            "late_checkout_days": late_checkout_count,
+            "shift_capped_days": shift_capped_count,
+        }
+        summary_rows.append(summary_row)
+
+    # Create DataFrame and sort by employee_id
+    summary_summary_df = pd.DataFrame(summary_rows)
+    if not summary_summary_df.empty:
+        summary_summary_df = summary_summary_df.sort_values("employee_id")
+
+    return summary_summary_df
+
+
 def write_excel(
     attendences: list[dict[str, Any]], device_logs: list[dict[str, Any]], finger_logs: list[dict[str, Any]], migration_logs: list[dict[str, Any]], user_logs: list[dict[str, Any]], merged: pd.DataFrame
 ) -> io.BytesIO:
     """Write data to Excel file with formatting."""
     output = io.BytesIO()
+
+    # Generate employee summary sheet
+    employee_summary = create_employee_summary_sheet(merged)
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         pd.DataFrame(attendences).to_excel(writer, sheet_name="Attendences", index=False)
@@ -318,6 +393,7 @@ def write_excel(
         pd.DataFrame(migration_logs).to_excel(writer, sheet_name="Migrations", index=False)
         pd.DataFrame(user_logs).to_excel(writer, sheet_name="Users", index=False)
         merged.to_excel(writer, sheet_name="AttendanceSummary", index=False)
+        employee_summary.to_excel(writer, sheet_name="EmployeeSummary", index=False)
 
     output.seek(0)
     wb = load_workbook(output)
