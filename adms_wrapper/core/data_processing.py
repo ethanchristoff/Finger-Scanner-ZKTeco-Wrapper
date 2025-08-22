@@ -122,17 +122,9 @@ def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | No
         # Fallback to the range of worked data
         all_days = pd.date_range(start=worked_summary["day"].min(), end=worked_summary["day"].max(), freq="D").date
 
-    # Get all employees from worked data and comprehensive employee data
     worked_employees = set(worked_summary["employee_id"].unique())
 
-    # Also include all known employees if we have a date range filter
-    all_known_employees = set()
-    if start_date and end_date:
-        comprehensive_employees = get_comprehensive_employee_data() or []
-        all_known_employees = {emp.get("employee_id", "") for emp in comprehensive_employees if emp.get("employee_id")}
-
-    # Combine both sets to ensure we include all relevant employees
-    all_employees = worked_employees.union(all_known_employees) if all_known_employees else worked_employees
+    all_employees = worked_employees
 
     complete_records = []
 
