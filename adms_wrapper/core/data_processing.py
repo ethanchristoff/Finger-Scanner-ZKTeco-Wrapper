@@ -70,7 +70,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         # If actual time is greater than expected, cap it and set flag
         if time_diff > expected_duration:
             time_spent_str = str(expected_duration).split(".")[0]
-            return time_spent_str, True, shift_end_dt
+            return time_spent_str, True, end_time  # Keep actual end_time, only cap the time_spent
         else:
             time_spent_str = str(time_diff).split(".")[0]
             return time_spent_str, False, end_time
@@ -79,12 +79,11 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         eight_hours = timedelta(hours=8)
         if time_diff > eight_hours:
             time_spent_str = str(eight_hours).split(".")[0]
-            # Calculate capped end time
-            capped_end_time = start_time + eight_hours
-            return time_spent_str, True, capped_end_time
-        else:
-            time_spent_str = str(time_diff).split(".")[0]
-            return time_spent_str, False, end_time
+            # Keep actual end_time, only cap the time_spent for payroll purposes
+            return time_spent_str, True, end_time
+
+        time_spent_str = str(time_diff).split(".")[0]
+        return time_spent_str, False, end_time
 
 
 def process_attendance_entries(df_att: pd.DataFrame, shift_dict: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
