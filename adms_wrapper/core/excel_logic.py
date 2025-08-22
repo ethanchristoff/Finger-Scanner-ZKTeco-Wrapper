@@ -400,6 +400,8 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
     # Create DataFrame and sort by employee_id
     summary_summary_df = pd.DataFrame(summary_rows)
     if not summary_summary_df.empty:
+        # Convert employee_id to string to avoid type mismatch during sorting
+        summary_summary_df["employee_id"] = summary_summary_df["employee_id"].astype(str)
         summary_summary_df = summary_summary_df.sort_values("employee_id")
 
     return summary_summary_df
