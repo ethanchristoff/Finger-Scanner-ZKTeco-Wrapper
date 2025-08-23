@@ -241,6 +241,80 @@
         .delete-btn:hover {
             background: #c0392b;
         }
+
+        .edit-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-right: 5px;
+            transition: background 0.3s ease;
+        }
+
+        .edit-btn:hover {
+            background: #2980b9;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: none;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .modal-title {
+            color: #2c3e50;
+            font-size: 1.5em;
+            margin: 0;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+        }
+
+        .modal-form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
         
         .flash-messages {
             margin-bottom: 20px;
@@ -423,11 +497,17 @@
                         <div class="item-card">
                             <div class="item-header">
                                 <div class="item-title">{{ employee.employee_id }}</div>
-                                <form method="POST" style="display: inline;">
-                                    <input type="hidden" name="action" value="delete_employee">
-                                    <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
-                                    <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
-                                </form>
+                                <div>
+                                    <button type="button" class="edit-btn" 
+                                            onclick="openEditModal('{{ employee.employee_id }}', '{{ employee.employee_name or '' }}', '{{ employee.designation or '' }}', '{{ employee.branch_name or '' }}', '{{ employee.shift_name or '' }}')">
+                                        ✏️
+                                    </button>
+                                    <form method="POST" style="display: inline;">
+                                        <input type="hidden" name="action" value="delete_employee">
+                                        <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
+                                        <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
+                                    </form>
+                                </div>
                             </div>
                             <div class="item-details">
                                 <strong>Name:</strong> {{ employee.employee_name or "Not set" }}<br>
@@ -669,6 +749,69 @@
         </div>
     </div>
 
+    <!-- Edit Employee Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">✏️ Edit Employee</h3>
+                <span class="close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <form method="POST" id="editForm">
+                <input type="hidden" name="action" value="employee">
+                <input type="hidden" id="edit_employee_id" name="edit_employee_id" value="">
+                
+                <div class="modal-form-grid">
+                    <div class="form-group">
+                        <label for="edit_employee_name">Employee Name <small>(Optional)</small></label>
+                        <input type="text" id="edit_employee_name" name="employee_name" placeholder="Enter full name or select existing" list="name_suggestions_edit">
+                        <datalist id="name_suggestions_edit">
+                            {% for name in all_employee_names %}
+                            <option value="{{ name }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_designation">Designation <small>(Optional)</small></label>
+                        <input type="text" id="edit_designation" name="designation" list="designation_suggestions_edit" placeholder="Enter designation or select existing">
+                        <datalist id="designation_suggestions_edit">
+                            {% for designation in all_designations %}
+                            <option value="{{ designation }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_branch_name">Branch <small>(Optional)</small></label>
+                        <select id="edit_branch_name" name="branch_name">
+                            <option value="">-- Keep Current --</option>
+                            {% for branch in all_branches %}
+                            <option value="{{ branch }}">{{ branch }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_shift_name">Shift Template <small>(Optional)</small></label>
+                        <select id="edit_shift_name" name="shift_name">
+                            <option value="">-- Keep Current --</option>
+                            {% for template in shift_templates %}
+                            <option value="{{ template.shift_name }}" title="{{ template.shift_start }} - {{ template.shift_end }}">
+                                {{ template.shift_name }} ({{ template.shift_start }} - {{ template.shift_end }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button type="submit" class="btn">💾 Update Employee</button>
+                    <button type="button" class="btn" onclick="closeEditModal()" style="background: #95a5a6; margin-left: 10px;">Cancel</button>
+                </div>
+                <small style="color: #666; display: block; text-align: center; margin-top: 10px;">
+                    Leave fields empty to keep existing values unchanged.
+                </small>
+            </form>
+        </div>
+    </div>
+
     <script>
         function showTab(tabName) {
             // Hide all tab contents
@@ -699,6 +842,38 @@
                     }
                 }
             });
+        });
+
+        // Edit modal functions
+        function openEditModal(employeeId, employeeName, designation, branchName, shiftName) {
+            document.getElementById('edit_employee_id').value = employeeId;
+            document.getElementById('edit_employee_name').value = employeeName || '';
+            document.getElementById('edit_designation').value = designation || '';
+            document.getElementById('edit_branch_name').value = branchName || '';
+            document.getElementById('edit_shift_name').value = shiftName || '';
+            document.getElementById('editModal').style.display = 'block';
+            
+            // Update modal title to include employee ID
+            document.querySelector('.modal-title').textContent = `✏️ Edit Employee: ${employeeId}`;
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
+            }
+        }
+
+        // Handle Escape key to close modal
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeEditModal();
+            }
         });
     </script>
 </body>

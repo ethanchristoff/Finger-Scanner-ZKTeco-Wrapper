@@ -383,3 +383,30 @@ def delete_comprehensive_employee(employee_id: str):
         pass
 
     return results
+
+
+def update_comprehensive_employee(employee_id: str, employee_name: str | None = None, designation: str | None = None, branch_name: str | None = None, shift_name: str | None = None) -> list:
+    """Update specific fields for an employee while preserving others."""
+    results = []
+
+    # Update employee name if provided
+    if employee_name is not None and employee_name.strip():
+        results.append(add_employee_name_mapping(employee_id, employee_name))
+
+    # Update designation if provided
+    if designation is not None and designation.strip():
+        results.append(add_employee_designation_mapping(employee_id, designation))
+
+    # Update branch if provided
+    if branch_name is not None and branch_name.strip():
+        results.append(add_employee_branch_mapping(employee_id, branch_name))
+
+    # Update shift if provided
+    if shift_name is not None and shift_name.strip():
+        try:
+            results.append(assign_shift_template_to_user(employee_id, shift_name))
+        except ValueError:
+            # If shift template doesn't exist, skip
+            pass
+
+    return results

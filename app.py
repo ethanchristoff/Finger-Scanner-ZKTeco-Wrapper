@@ -32,6 +32,7 @@ from adms_wrapper.core.db_queries import (
     get_shift_templates,
     get_user_shift_mappings,
     get_users,
+    update_comprehensive_employee,
 )
 from adms_wrapper.core.excel_logic import generate_attendance_summary, write_excel
 
@@ -238,25 +239,52 @@ def shift_templates() -> Any:
 def employee_management() -> Any:
     """Comprehensive employee management."""
     if request.method == "POST":
-        delete_emp_id = request.form.get("delete_employee_id")
-        if delete_emp_id:
-            delete_comprehensive_employee(delete_emp_id)
-            flash(f"Employee data deleted: {delete_emp_id}", "success")
+        action = request.form.get("action", "add")
+
+        if action == "delete":
+            delete_emp_id = request.form.get("delete_employee_id")
+            if delete_emp_id:
+                delete_comprehensive_employee(delete_emp_id)
+                flash(f"Employee data deleted: {delete_emp_id}", "success")
+                return redirect(url_for("employee_management"))
+
+        elif action == "edit":
+            edit_emp_id = request.form.get("edit_employee_id")
+            employee_name = request.form.get("employee_name", "").strip()
+            designation = request.form.get("designation", "").strip()
+            branch_name = request.form.get("branch_name", "").strip()
+            shift_name = request.form.get("shift_name", "").strip()
+
+            if edit_emp_id:
+                # Use the new update function that only updates provided fields
+                update_comprehensive_employee(
+                    edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
+                )
+                flash(f"Employee data updated: {edit_emp_id}", "success")
+            else:
+                flash("Employee ID is required for editing.", "error")
             return redirect(url_for("employee_management"))
 
-        employee_id = request.form.get("employee_id")
-        employee_name = request.form.get("employee_name", "")
-        designation = request.form.get("designation", "")
-        branch_name = request.form.get("branch_name", "")
-        shift_name = request.form.get("shift_name", "")
+        else:  # Default add/update action
+            delete_emp_id = request.form.get("delete_employee_id")
+            if delete_emp_id:
+                delete_comprehensive_employee(delete_emp_id)
+                flash(f"Employee data deleted: {delete_emp_id}", "success")
+                return redirect(url_for("employee_management"))
 
-        if employee_id:
-            add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
-            flash(f"Employee data updated: {employee_id}", "success")
-        else:
-            flash("Employee ID is required.", "error")
+            employee_id = request.form.get("employee_id")
+            employee_name = request.form.get("employee_name", "")
+            designation = request.form.get("designation", "")
+            branch_name = request.form.get("branch_name", "")
+            shift_name = request.form.get("shift_name", "")
 
-        return redirect(url_for("employee_management"))
+            if employee_id:
+                add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+                flash(f"Employee data updated: {employee_id}", "success")
+            else:
+                flash("Employee ID is required.", "error")
+
+            return redirect(url_for("employee_management"))
 
     employees = get_comprehensive_employee_data() or []
     all_branches = sorted({b["branch_name"] for b in get_device_branch_mappings() or []})
@@ -283,17 +311,31 @@ def unified_management() -> Any:
                 flash(f"Employee deleted: {delete_emp_id}", "success")
                 return redirect(url_for("unified_management"))
 
-            employee_id = request.form.get("employee_id")
-            employee_name = request.form.get("employee_name", "")
-            designation = request.form.get("designation", "")
-            branch_name = request.form.get("branch_name", "")
-            shift_name = request.form.get("shift_name", "")
+            edit_emp_id = request.form.get("edit_employee_id")
+            if edit_emp_id:
+                # Handle edit action
+                employee_name = request.form.get("employee_name", "").strip()
+                designation = request.form.get("designation", "").strip()
+                branch_name = request.form.get("branch_name", "").strip()
+                shift_name = request.form.get("shift_name", "").strip()
 
-            if employee_id:
-                add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
-                flash(f"Employee data updated: {employee_id}", "success")
+                update_comprehensive_employee(
+                    edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
+                )
+                flash(f"Employee data updated: {edit_emp_id}", "success")
             else:
-                flash("Employee ID is required.", "error")
+                # Handle add action
+                employee_id = request.form.get("employee_id")
+                employee_name = request.form.get("employee_name", "")
+                designation = request.form.get("designation", "")
+                branch_name = request.form.get("branch_name", "")
+                shift_name = request.form.get("shift_name", "")
+
+                if employee_id:
+                    add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+                    flash(f"Employee data updated: {employee_id}", "success")
+                else:
+                    flash("Employee ID is required.", "error")
 
         elif action == "shift_template":
             # Handle shift template management
