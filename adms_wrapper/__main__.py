@@ -127,7 +127,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
 
 
 def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, Any]]:
-    """Generate attendance records only for days when employees actually came in."""
+    """Generate attendance records only for days when employees actually came in, excluding Sundays."""
     if worked_summary.empty:
         return []
 
@@ -135,7 +135,14 @@ def generate_complete_records(worked_summary: pd.DataFrame) -> list[dict[str, An
 
     # Only include records where employees actually worked (no absent days)
     for _, row in worked_summary.iterrows():
-        complete_records.append(row.to_dict())
+        day = row["day"]
+        try:
+            # Check if it's Sunday (weekday 6) and skip if it is
+            if pd.to_datetime(day).weekday() != 6:
+                complete_records.append(row.to_dict())
+        except:
+            # If date parsing fails, include the row anyway
+            complete_records.append(row.to_dict())
 
     return complete_records
 

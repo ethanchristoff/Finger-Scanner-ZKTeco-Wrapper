@@ -75,7 +75,22 @@ def attendance_summary(start_date: Optional[str] = Query(None, description="Star
             attendences = df.to_dict(orient="records")
     summary_df = process_attendance_summary(attendences, start_date, end_date)
     if summary_df is not None:
-        return summary_df.to_dict(orient="records")
+        # Filter out Sundays from the API response
+        filtered_records = []
+        for record in summary_df.to_dict(orient="records"):
+            day = record.get("day")
+            if day and day != "Subtotal":
+                try:
+                    # Check if it's Sunday (weekday 6) and skip if it is
+                    if pd.to_datetime(day).weekday() != 6:
+                        filtered_records.append(record)
+                except:
+                    # If date parsing fails, include the record anyway
+                    filtered_records.append(record)
+            else:
+                # Include non-date records like subtotals
+                filtered_records.append(record)
+        return filtered_records
     return []
 
 

@@ -105,7 +105,7 @@ def process_attendance_entries(df_att: pd.DataFrame, shift_dict: dict[str, dict[
 
 
 def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | None = None, end_date: str | None = None) -> list[dict[str, Any]]:
-    """Generate complete records including absent days for the full date range."""
+    """Generate complete records including absent days for the full date range, excluding Sundays."""
     if worked_summary.empty:
         # If no worked data but we have date range, generate all absent days
         if start_date and end_date:
@@ -120,6 +120,9 @@ def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | No
     else:
         # Fallback to the range of worked data
         all_days = pd.date_range(start=worked_summary["day"].min(), end=worked_summary["day"].max(), freq="D").date
+
+    # Filter out Sundays (weekday 6)
+    all_days = [day for day in all_days if pd.to_datetime(day).weekday() != 6]
 
     worked_employees = set(worked_summary["employee_id"].unique())
 
@@ -157,7 +160,7 @@ def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | No
 
 
 def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[dict[str, Any]]:
-    """Generate absent day records for all known employees within a specific date range."""
+    """Generate absent day records for all known employees within a specific date range, excluding Sundays."""
     # Get all known employees from the system
     all_employees = get_comprehensive_employee_data() or []
 
@@ -168,6 +171,9 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
     start_pd = pd.to_datetime(start_date).date()
     end_pd = pd.to_datetime(end_date).date()
     all_days = pd.date_range(start=start_pd, end=end_pd, freq="D").date
+
+    # Filter out Sundays (weekday 6)
+    all_days = [day for day in all_days if pd.to_datetime(day).weekday() != 6]
 
     absent_records = []
 

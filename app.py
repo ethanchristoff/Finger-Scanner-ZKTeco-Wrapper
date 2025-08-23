@@ -480,6 +480,32 @@ def filter_attendances_by_designation(df: pd.DataFrame, designation: str) -> pd.
     return df
 
 
+def filter_out_sundays(summary: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Filter out Sunday entries from the summary."""
+    filtered_summary = []
+    for row in summary:
+        day = row.get("day")
+        if day and day != "Subtotal":
+            try:
+                # Try to parse the day as a date
+                if isinstance(day, str):
+                    day_date = pd.to_datetime(day).date()
+                else:
+                    day_date = day
+                
+                # Check if it's Sunday (weekday 6)
+                if pd.to_datetime(day_date).weekday() != 6:
+                    filtered_summary.append(row)
+            except:
+                # If date parsing fails, include the row (might be a subtotal or other special row)
+                filtered_summary.append(row)
+        else:
+            # Include non-date rows like subtotals
+            filtered_summary.append(row)
+    
+    return filtered_summary
+
+
 def apply_filters(
     attendences: list[dict[str, Any]],
     start_date: str | None,
@@ -517,7 +543,7 @@ def apply_filters(
 
 
 def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings: list[dict[str, Any]], start_date: str | None = None, end_date: str | None = None) -> list[dict[str, Any]]:
-    """Prepare summary data for dashboard."""
+    """Prepare summary data for dashboard, excluding Sundays."""
     summary_df = process_attendance_summary(attendences, start_date, end_date)
     if summary_df is None or summary_df.empty:
         return []
@@ -533,8 +559,12 @@ def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings:
         return []
 
     dashboard_summary_df = full_summary_df[(full_summary_df["work_status"] == "worked") & (full_summary_df["day"] != "Subtotal")].copy()
+    
+    # Convert to list and filter out Sundays
+    dashboard_summary = dashboard_summary_df.to_dict(orient="records")
+    dashboard_summary = filter_out_sundays(dashboard_summary)
 
-    return dashboard_summary_df.to_dict(orient="records")
+    return dashboard_summary
 
 
 def add_branch_info_to_summary(summary: list[dict[str, Any]]) -> None:
