@@ -25,6 +25,7 @@ from adms_wrapper.core.db_queries import (
     delete_user_shift_mapping,
     get_attendences,
     get_comprehensive_employee_data,
+    get_default_shift,
     get_device_branch_mappings,
     get_device_logs,
     get_employee_branch_mappings,
@@ -32,9 +33,12 @@ from adms_wrapper.core.db_queries import (
     get_employee_name_mappings,
     get_finger_log,
     get_migrations,
+    get_setting,
     get_shift_templates,
     get_user_shift_mappings,
     get_users,
+    set_default_shift,
+    set_setting,
     update_comprehensive_employee,
 )
 from adms_wrapper.core.excel_logic import generate_attendance_summary, write_excel
@@ -941,6 +945,41 @@ def bulk_employee_upload() -> Any:
     
     # GET request - show upload form
     return render_template("bulk_employee_upload.html")
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings() -> Any:
+    """Manage system settings like default shift."""
+    if request.method == "POST":
+        action = request.form.get("action")
+        
+        if action == "set_default_shift":
+            default_shift = request.form.get("default_shift")
+            
+            if not default_shift:
+                flash("Please select a default shift", "error")
+                return redirect(url_for("settings"))
+            
+            try:
+                set_default_shift(default_shift)
+                flash(f"Default shift set to '{default_shift}' successfully!", "success")
+            except Exception as e:
+                flash(f"Error setting default shift: {e!s}", "error")
+        
+        return redirect(url_for("settings"))
+    
+    # GET request - show settings form
+    try:
+        current_default_shift = get_default_shift()
+        all_shifts = get_shift_templates()
+    except Exception as e:
+        flash(f"Error loading settings: {e!s}", "error")
+        current_default_shift = None
+        all_shifts = []
+    
+    return render_template("settings.html",
+                         current_default_shift=current_default_shift,
+                         all_shifts=all_shifts)
 
 
 if __name__ == "__main__":

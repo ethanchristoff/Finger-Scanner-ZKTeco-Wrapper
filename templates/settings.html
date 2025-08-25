@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings - Employee Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .nav-links {
+            background: #34495e;
+            padding: 15px 30px;
+            text-align: center;
+        }
+        
+        .nav-links a {
+            color: #ecf0f1;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .nav-links a:hover {
+            background: #3498db;
+            transform: translateY(-2px);
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .settings-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid #3498db;
+        }
+        
+        .settings-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+        
+        .settings-section p {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .current-setting {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            color: #2d5a2d;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .current-setting.none {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .flash-messages {
+            margin-bottom: 25px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert::before {
+            content: '✓';
+            margin-right: 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .alert-error::before {
+            content: '✗';
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            color: #0d47a1;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ System Settings</h1>
+            <p>Configure system-wide defaults and preferences</p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">🏠 Dashboard</a>
+            <a href="/unified_management">👥 Employee Management</a>
+            <a href="/shift_templates">⏰ Shift Templates</a>
+            <a href="/bulk_employee_upload">📤 Bulk Upload</a>
+            <a href="/settings" style="background: #3498db;">⚙️ Settings</a>
+        </div>
+        
+        <div class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <div class="settings-section">
+                <h3>🎯 Default Shift Assignment</h3>
+                <p>When adding new employees without specifying a shift, they will automatically be assigned to the default shift you configure below.</p>
+                
+                {% if current_default_shift %}
+                    <div class="current-setting">
+                        <strong>Current Default Shift:</strong> {{ current_default_shift }}
+                    </div>
+                {% else %}
+                    <div class="current-setting none">
+                        <strong>No default shift configured</strong> - New employees without shifts will remain unassigned
+                    </div>
+                {% endif %}
+                
+                <form method="POST">
+                    <input type="hidden" name="action" value="set_default_shift">
+                    
+                    <div class="form-group">
+                        <label for="default_shift">Select Default Shift:</label>
+                        <select name="default_shift" id="default_shift" required>
+                            <option value="">-- Choose a default shift --</option>
+                            {% for shift in all_shifts %}
+                                <option value="{{ shift.shift_name }}" 
+                                        {% if shift.shift_name == current_default_shift %}selected{% endif %}>
+                                    {{ shift.shift_name }} ({{ shift.shift_start }} - {{ shift.shift_end }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn">
+                        💾 Save Default Shift
+                    </button>
+                </form>
+                
+                <div class="info-box">
+                    <strong>ℹ️ How it works:</strong>
+                    When you add employees through the bulk upload feature or individual employee creation without specifying a shift, 
+                    they will automatically be assigned to the default shift you select here. This ensures all employees have 
+                    proper shift assignments for attendance tracking.
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>🔒 Duplicate Prevention</h3>
+                <p>The system automatically prevents duplicate names to maintain data integrity:</p>
+                
+                <div class="info-box">
+                    <strong>✅ Automatic Protection:</strong>
+                    • Employee names must be unique across the system<br>
+                    • Shift template names cannot be duplicated<br>
+                    • Designation names must be unique per employee<br>
+                    • Branch names must be unique per employee<br><br>
+                    
+                    <strong>📝 What this means:</strong>
+                    When adding or updating employee data, the system will prevent you from creating 
+                    duplicates and show clear error messages if conflicts are detected.
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
