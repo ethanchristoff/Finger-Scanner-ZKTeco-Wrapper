@@ -1,5 +1,6 @@
 import os
 import tempfile
+from datetime import datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -722,20 +723,97 @@ def download_filtered_attendance() -> Any:
     add_branch_info_to_summary(summary)
     add_employee_name_to_summary(summary)
 
-    # Create simplified DataFrame with only the requested columns
-    filtered_data = []
+    # Create a comprehensive attendance summary that includes all dates for each employee
+    
+    # Parse date range
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    # Generate all dates in range (excluding Sundays)
+    all_dates = []
+    current_date = start_dt
+    while current_date <= end_dt:
+        if current_date.weekday() != 6:  # Exclude Sundays
+            all_dates.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+    
+    # Get all unique employees from the filtered data
+    if employee_id:
+        # If specific employee is filtered, only include that employee
+        all_employees = [{"employee_id": employee_id}]
+    else:
+        # Get all employees from the attendance records
+        all_employees = []
+        seen_employees = set()
+        for record in attendences:
+            emp_id = str(record.get("employee_id", ""))
+            if emp_id and emp_id not in seen_employees:
+                all_employees.append({"employee_id": emp_id})
+                seen_employees.add(emp_id)
+    
+    # Add employee names to the employee list
+    name_mappings = get_employee_name_mappings() or []
+    name_map = {str(n["employee_id"]): n["employee_name"] for n in name_mappings}
+    
+    for emp in all_employees:
+        emp["employee_name"] = name_map.get(str(emp["employee_id"]), "")
+    
+    # Apply additional filters to employee list if specified
+    if employee_name:
+        all_employees = [emp for emp in all_employees if employee_name.lower() in emp["employee_name"].lower()]
+    
+    if designation:
+        designation_mappings = get_employee_designation_mappings() or []
+        designation_map = {str(d["employee_id"]): d["designation"] for d in designation_mappings}
+        all_employees = [emp for emp in all_employees if designation.lower() in designation_map.get(str(emp["employee_id"]), "").lower()]
+    
+    if employee_branch:
+        branch_mappings = get_employee_branch_mappings() or []
+        branch_map = {str(b["employee_id"]): b["branch_name"] for b in branch_mappings}
+        all_employees = [emp for emp in all_employees if employee_branch.lower() in branch_map.get(str(emp["employee_id"]), "").lower()]
+    
+    # Create a lookup dictionary for existing attendance records
+    attendance_lookup = {}
     for record in summary:
-        filtered_data.append({
-            "Employee ID": record.get("employee_id", ""),
-            "Employee Name": record.get("employee_name", ""),
-            "Date": record.get("day", ""),
-            "Time In": record.get("start_time", ""),
-            "Time Out": record.get("end_time", ""),
-            "Shift Flag": "Yes" if record.get("shift_flag", False) else "No"
-        })
+        key = f"{record.get('employee_id')}_{record.get('day')}"
+        attendance_lookup[key] = record
+    
+    # Create comprehensive attendance data
+    filtered_data = []
+    for employee in all_employees:
+        emp_id = employee["employee_id"]
+        emp_name = employee["employee_name"]
+        
+        for date in all_dates:
+            key = f"{emp_id}_{date}"
+            
+            if key in attendance_lookup:
+                # Employee has attendance record for this date
+                record = attendance_lookup[key]
+                filtered_data.append({
+                    "Employee ID": emp_id,
+                    "Employee Name": emp_name,
+                    "Date": date,
+                    "Time In": record.get("start_time", ""),
+                    "Time Out": record.get("end_time", ""),
+                    "Shift Flag": "Yes" if record.get("shift_flag", False) else "No"
+                })
+            else:
+                # Employee has no attendance record for this date - show as absent
+                filtered_data.append({
+                    "Employee ID": emp_id,
+                    "Employee Name": emp_name,
+                    "Date": date,
+                    "Time In": "Absent",
+                    "Time Out": "Absent",
+                    "Shift Flag": "No"
+                })
 
     # Create DataFrame and Excel file
     df = pd.DataFrame(filtered_data)
+    
+    # Sort by Employee ID and Date for better organization
+    df = df.sort_values(["Employee ID", "Date"])
     
     # Create temporary file
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
