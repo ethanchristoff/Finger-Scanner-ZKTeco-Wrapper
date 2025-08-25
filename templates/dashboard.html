@@ -385,12 +385,15 @@
                         <button type="button" class="btn btn-success" onclick="downloadExcel()">
                             <span>📊</span> Download Excel
                         </button>
+                        <button type="button" class="btn btn-info" onclick="downloadFilteredAttendance()">
+                            <span>📋</span> Download Filtered Attendance
+                        </button>
                         <a href="/unified_management" class="btn btn-primary">
                             <span>🎛️</span> Management Center
                         </a>
                     </div>
                     <div style="margin-top: 12px; font-size: 0.8rem; color: #a0aec0; text-align: center;">
-                        <span style="color: #e53e3e;">*</span> Start Date and End Date are required for Excel download
+                        <span style="color: #e53e3e;">*</span> Start Date and End Date are required for Excel downloads
                     </div>
                 </form>
             </div>
@@ -662,6 +665,59 @@
             });
             
             window.location.href = `/download_xlsx?${params.toString()}`;
+        }
+        
+        function downloadFilteredAttendance() {
+            const startDate = document.querySelector('input[name="start_date"]').value;
+            const endDate = document.querySelector('input[name="end_date"]').value;
+            
+            if (!startDate || !endDate) {
+                alert('⚠️ Both start date and end date are required to download the filtered attendance.\n\nPlease select a date range before downloading.');
+                
+                // Highlight the date fields if they're empty
+                const startDateField = document.querySelector('input[name="start_date"]');
+                const endDateField = document.querySelector('input[name="end_date"]');
+                
+                if (!startDate) {
+                    startDateField.style.borderColor = '#e53e3e';
+                    startDateField.focus();
+                }
+                if (!endDate) {
+                    endDateField.style.borderColor = '#e53e3e';
+                    if (!startDate) {
+                        setTimeout(() => endDateField.focus(), 100);
+                    } else {
+                        endDateField.focus();
+                    }
+                }
+                
+                // Reset border color after 3 seconds
+                setTimeout(() => {
+                    startDateField.style.borderColor = '';
+                    endDateField.style.borderColor = '';
+                }, 3000);
+                
+                return;
+            }
+            
+            // If validation passes, construct the download URL
+            const employeeId = document.querySelector('select[name="employee_id"]').value;
+            const branchName = document.querySelector('input[name="branch_name"]').value;
+            const employeeBranch = document.querySelector('input[name="employee_branch"]').value;
+            const employeeName = document.querySelector('input[name="employee_name"]').value;
+            const designation = document.querySelector('input[name="designation"]').value;
+            
+            const params = new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate,
+                employee_id: employeeId,
+                branch_name: branchName,
+                employee_branch: employeeBranch,
+                employee_name: employeeName,
+                designation: designation
+            });
+            
+            window.location.href = `/download_filtered_attendance?${params.toString()}`;
         }
     </script>
 </body>

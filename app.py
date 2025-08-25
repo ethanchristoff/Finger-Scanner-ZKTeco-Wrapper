@@ -1,4 +1,5 @@
 import os
+import tempfile
 from typing import Any
 
 import pandas as pd
@@ -683,6 +684,65 @@ def download_xlsx() -> Any:
     new_output = write_excel(attendences, device_logs, finger_logs, migration_logs, user_logs, merged)
 
     return send_file(new_output, as_attachment=True, download_name="output.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/download_filtered_attendance")
+def download_filtered_attendance() -> Any:
+    """Download a filtered attendance summary with emp_id, emp_name, date, time_in, time_out, shift_flag."""
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    employee_id = request.args.get("employee_id")
+    branch_name = request.args.get("branch_name")
+    employee_branch = request.args.get("employee_branch")
+    employee_name = request.args.get("employee_name")
+    designation = request.args.get("designation")
+
+    # Validate that both start_date and end_date are provided
+    if not start_date or not end_date:
+        flash("Both start date and end date are required to download the Excel file.", "error")
+        return redirect(
+            url_for(
+                "index",
+                start_date=start_date or "",
+                end_date=end_date or "",
+                employee_id=employee_id or "",
+                branch_name=branch_name or "",
+                employee_branch=employee_branch or "",
+                employee_name=employee_name or "",
+                designation=designation or "",
+            )
+        )
+
+    # Get the filtered attendance data
+    attendences = get_attendences() or []
+    attendences = apply_filters(attendences, start_date, end_date, employee_id, branch_name, employee_branch, employee_name, designation)
+
+    shift_mappings = get_user_shift_mappings() or []
+    summary = prepare_dashboard_summary(attendences, shift_mappings, start_date, end_date)
+    add_branch_info_to_summary(summary)
+    add_employee_name_to_summary(summary)
+
+    # Create simplified DataFrame with only the requested columns
+    filtered_data = []
+    for record in summary:
+        filtered_data.append({
+            "Employee ID": record.get("employee_id", ""),
+            "Employee Name": record.get("employee_name", ""),
+            "Date": record.get("day", ""),
+            "Time In": record.get("start_time", ""),
+            "Time Out": record.get("end_time", ""),
+            "Shift Flag": "Yes" if record.get("shift_flag", False) else "No"
+        })
+
+    # Create DataFrame and Excel file
+    df = pd.DataFrame(filtered_data)
+    
+    # Create temporary file
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+        df.to_excel(tmp.name, index=False, sheet_name='Filtered Attendance')
+        tmp_path = tmp.name
+
+    return send_file(tmp_path, as_attachment=True, download_name=f"filtered_attendance_{start_date}_to_{end_date}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 if __name__ == "__main__":
