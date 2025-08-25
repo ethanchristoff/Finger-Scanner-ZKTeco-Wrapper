@@ -395,6 +395,7 @@
         <div class="nav-links">
             <a href="/">📊 Dashboard</a>
             <a href="/unified_management" class="active">🎛️ Management Center</a>
+            <a href="/bulk_employee_upload">📤 Bulk Upload</a>
         </div>
         
         <div class="content">
@@ -436,6 +437,7 @@
                 <button class="tab-btn" onclick="showTab('designations')">💼 Designations</button>
                 <button class="tab-btn" onclick="showTab('names')">📝 Employee Names</button>
                 <button class="tab-btn" onclick="showTab('devices')">📱 Device Mappings</button>
+                <button class="tab-btn" onclick="window.location.href='{{ url_for('bulk_employee_upload') }}'">📤 Bulk Upload</button>
             </div>
             
             <!-- Employees Tab -->

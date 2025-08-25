@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bulk Employee Upload - Finger Scanner Data UI</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0; 
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 20px auto; 
+            background: #2d3748; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+            overflow: hidden;
+            border: 1px solid #4a5568;
+        }
+        .header { 
+            background: linear-gradient(135deg, #1a202c 0%, #2c5282 100%);
+            color: #e2e8f0;
+            padding: 24px 32px;
+            text-align: center;
+            border-bottom: 1px solid #4a5568;
+        }
+        .header img { 
+            max-height: 48px; 
+            margin-bottom: 16px;
+            border-radius: 8px;
+        }
+        .header h1 { 
+            font-size: 2rem; 
+            font-weight: 600; 
+            margin: 0;
+            letter-spacing: -0.025em;
+            color: #f7fafc;
+        }
+        .content { padding: 32px; }
+        
+        .upload-section {
+            background: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f7fafc;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label { 
+            font-weight: 500; 
+            color: #cbd5e0; 
+            margin-bottom: 8px;
+            display: block;
+            font-size: 0.9rem;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #4a5568;
+            border-radius: 8px;
+            background: #2d3748;
+            color: #e2e8f0;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .file-input:hover {
+            border-color: #3182ce;
+            background: #1a202c;
+        }
+        
+        .file-input input[type="file"] {
+            display: none;
+        }
+        
+        .btn { 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 500; 
+            font-size: 0.875rem; 
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .btn-primary { 
+            background: #3182ce; 
+            color: white; 
+        }
+        
+        .btn-primary:hover { 
+            background: #2c5282; 
+            transform: translateY(-1px);
+        }
+        
+        .btn-success { 
+            background: #38a169; 
+            color: white; 
+        }
+        
+        .btn-success:hover { 
+            background: #2f855a; 
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary { 
+            background: #4a5568; 
+            color: white; 
+        }
+        
+        .btn-secondary:hover { 
+            background: #2d3748; 
+        }
+        
+        .instructions {
+            background: #1a202c;
+            border: 1px solid #4a5568;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .instructions h3 {
+            color: #f7fafc;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        
+        .instructions ol {
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+            color: #cbd5e0;
+        }
+        
+        .template-info {
+            background: rgba(56, 161, 105, 0.1);
+            border: 1px solid #38a169;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .template-info h4 {
+            color: #68d391;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        
+        .flash-message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .flash-success {
+            background: rgba(56, 161, 105, 0.2);
+            color: #68d391;
+            border: 1px solid #38a169;
+        }
+        
+        .flash-error {
+            background: rgba(229, 62, 62, 0.2);
+            color: #fc8181;
+            border: 1px solid #e53e3e;
+        }
+        
+        .sample-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            background: #2d3748;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .sample-table th,
+        .sample-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #4a5568;
+        }
+        
+        .sample-table th {
+            background: #1a202c;
+            color: #f7fafc;
+            font-weight: 600;
+        }
+        
+        .sample-table td {
+            color: #cbd5e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{ url_for('static', filename='FDE.png') }}" alt="Company Logo">
+            <h1>Bulk Employee Upload</h1>
+        </div>
+        
+        <div class="content">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ 'success' if category == 'success' else 'error' }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Instructions -->
+            <div class="instructions">
+                <h3>📋 How to Upload Employees in Bulk</h3>
+                <ol>
+                    <li>Download the Excel template below to see the required format</li>
+                    <li>Fill in your employee data using the exact column headers: <strong>EMP No</strong>, <strong>EMP Name</strong>, <strong>Branch</strong>, <strong>Designation</strong></li>
+                    <li>Save your file as an Excel format (.xlsx or .xls)</li>
+                    <li>Upload your completed file using the form below</li>
+                    <li>Review the results and fix any errors if needed</li>
+                </ol>
+                
+                <div class="template-info">
+                    <h4>📊 Template Format</h4>
+                    <p>Your Excel file must contain these exact column headers:</p>
+                    <table class="sample-table">
+                        <thead>
+                            <tr>
+                                <th>EMP No</th>
+                                <th>EMP Name</th>
+                                <th>Branch</th>
+                                <th>Designation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>001</td>
+                                <td>John Smith</td>
+                                <td>Main Office</td>
+                                <td>Manager</td>
+                            </tr>
+                            <tr>
+                                <td>002</td>
+                                <td>Jane Doe</td>
+                                <td>Branch A</td>
+                                <td>Developer</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Template Download -->
+            <div class="upload-section">
+                <div class="section-title">
+                    <span>📥</span> Download Template
+                </div>
+                <p style="color: #cbd5e0; margin-bottom: 16px;">
+                    Download the Excel template with sample data to ensure correct formatting:
+                </p>
+                <a href="{{ url_for('download_employee_template') }}" class="btn btn-success">
+                    <span>📊</span> Download Excel Template
+                </a>
+            </div>
+            
+            <!-- File Upload -->
+            <div class="upload-section">
+                <div class="section-title">
+                    <span>📤</span> Upload Employee Data
+                </div>
+                
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="file">Select Excel File:</label>
+                        <div class="file-input" onclick="document.getElementById('file').click()">
+                            <input type="file" id="file" name="file" accept=".xlsx,.xls" required>
+                            <div id="file-display">
+                                <span>🗂️</span> Click to choose Excel file (.xlsx or .xls)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <span>🚀</span> Upload and Process
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Navigation -->
+            <div style="text-align: center; margin-top: 32px;">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <span>🏠</span> Back to Dashboard
+                </a>
+                <a href="{{ url_for('unified_management') }}" class="btn btn-secondary">
+                    <span>🎛️</span> Management Center
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Handle file selection display
+        document.getElementById('file').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'Click to choose Excel file (.xlsx or .xls)';
+            const fileDisplay = document.getElementById('file-display');
+            
+            if (e.target.files[0]) {
+                fileDisplay.innerHTML = `<span>📄</span> ${fileName}`;
+                fileDisplay.style.color = '#68d391';
+            } else {
+                fileDisplay.innerHTML = '<span>🗂️</span> Click to choose Excel file (.xlsx or .xls)';
+                fileDisplay.style.color = '#e2e8f0';
+            }
+        });
+    </script>
+</body>
+</html>

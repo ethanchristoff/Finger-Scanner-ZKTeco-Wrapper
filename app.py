@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 from flask import Flask, flash, redirect, render_template, request, send_file, url_for
+from werkzeug.utils import secure_filename
 
 from adms_wrapper.core.data_processing import process_attendance_summary
 from adms_wrapper.core.db_queries import (
@@ -40,6 +41,10 @@ from adms_wrapper.core.excel_logic import generate_attendance_summary, write_exc
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
+
+# Configure upload settings
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
 
 
 def handle_shift_mapping_deletion(delete_user_id: str) -> None:
@@ -821,6 +826,121 @@ def download_filtered_attendance() -> Any:
         tmp_path = tmp.name
 
     return send_file(tmp_path, as_attachment=True, download_name=f"filtered_attendance_{start_date}_to_{end_date}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/download_employee_template")
+def download_employee_template() -> Any:
+    """Download Excel template for bulk employee upload."""
+    # Create sample data for the template
+    template_data = [
+        {"EMP No": "001", "EMP Name": "John Smith", "Branch": "Main Office", "Designation": "Manager"},
+        {"EMP No": "002", "EMP Name": "Jane Doe", "Branch": "Branch A", "Designation": "Developer"},
+        {"EMP No": "003", "EMP Name": "Bob Johnson", "Branch": "Branch B", "Designation": "Analyst"},
+    ]
+    
+    # Create DataFrame
+    df = pd.DataFrame(template_data)
+    
+    # Create temporary file
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+        df.to_excel(tmp.name, index=False, sheet_name='Employee Template')
+        tmp_path = tmp.name
+
+    return send_file(tmp_path, as_attachment=True, download_name="employee_bulk_upload_template.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/bulk_employee_upload", methods=["GET", "POST"])
+def bulk_employee_upload() -> Any:
+    """Handle bulk employee upload from Excel file."""
+    if request.method == "POST":
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            flash("No file selected. Please choose an Excel file to upload.", "error")
+            return redirect(url_for("bulk_employee_upload"))
+        
+        file = request.files['file']
+        
+        # Check if file has a name
+        if file.filename == '':
+            flash("No file selected. Please choose an Excel file to upload.", "error")
+            return redirect(url_for("bulk_employee_upload"))
+        
+        # Check if file is Excel format
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            flash("Invalid file format. Please upload an Excel file (.xlsx or .xls).", "error")
+            return redirect(url_for("bulk_employee_upload"))
+        
+        try:
+            # Read Excel file
+            df = pd.read_excel(file)
+            
+            # Validate required columns
+            required_columns = ['EMP No', 'EMP Name', 'Branch', 'Designation']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                flash(f"Missing required columns: {', '.join(missing_columns)}. Please use the template file.", "error")
+                return redirect(url_for("bulk_employee_upload"))
+            
+            # Process each row
+            success_count = 0
+            error_count = 0
+            errors = []
+            
+            for index, row in df.iterrows():
+                try:
+                    emp_no = str(row['EMP No']).strip()
+                    emp_name = str(row['EMP Name']).strip()
+                    branch = str(row['Branch']).strip()
+                    designation = str(row['Designation']).strip()
+                    
+                    # Validate required fields
+                    if not emp_no or emp_no == 'nan':
+                        errors.append(f"Row {index + 2}: Employee Number is required")
+                        error_count += 1
+                        continue
+                    
+                    if not emp_name or emp_name == 'nan':
+                        errors.append(f"Row {index + 2}: Employee Name is required")
+                        error_count += 1
+                        continue
+                    
+                    if not branch or branch == 'nan':
+                        errors.append(f"Row {index + 2}: Branch is required")
+                        error_count += 1
+                        continue
+                    
+                    if not designation or designation == 'nan':
+                        errors.append(f"Row {index + 2}: Designation is required")
+                        error_count += 1
+                        continue
+                    
+                    # Add comprehensive employee (this will handle all mappings)
+                    add_comprehensive_employee(emp_no, emp_name, designation, branch)
+                    success_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Row {index + 2}: {str(e)}")
+                    error_count += 1
+            
+            # Show results
+            if success_count > 0:
+                flash(f"Successfully added {success_count} employee(s).", "success")
+            
+            if error_count > 0:
+                flash(f"Failed to add {error_count} employee(s). Errors:", "error")
+                for error in errors[:5]:  # Show first 5 errors
+                    flash(error, "error")
+                if len(errors) > 5:
+                    flash(f"... and {len(errors) - 5} more errors.", "error")
+            
+        except Exception as e:
+            flash(f"Error reading Excel file: {str(e)}", "error")
+        
+        return redirect(url_for("bulk_employee_upload"))
+    
+    # GET request - show upload form
+    return render_template("bulk_employee_upload.html")
 
 
 if __name__ == "__main__":
