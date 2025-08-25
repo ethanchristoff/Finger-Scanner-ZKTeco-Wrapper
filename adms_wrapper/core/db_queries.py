@@ -59,12 +59,17 @@ def get_user_shift_mappings() -> list:
 def add_user_shift_mapping(user_id: str, shift_name: str, shift_start: str, shift_end: str):
     """Add or update a user shift mapping."""
     create_user_shift_mapping_table()
-    query = """
+    
+    # First delete any existing mapping for this user
+    delete_query = "DELETE FROM user_shift_mapping WHERE user_id = %s"
+    query_db(delete_query, (user_id,))
+    
+    # Then insert the new mapping
+    insert_query = """
     INSERT INTO user_shift_mapping (user_id, shift_name, shift_start, shift_end)
     VALUES (%s, %s, %s, %s)
-    ON DUPLICATE KEY UPDATE shift_name=VALUES(shift_name), shift_start=VALUES(shift_start), shift_end=VALUES(shift_end)
     """
-    return query_db(query, (user_id, shift_name, shift_start, shift_end))
+    return query_db(insert_query, (user_id, shift_name, shift_start, shift_end))
 
 
 def assign_shift_template_to_user(user_id: str, shift_name: str):
@@ -405,8 +410,10 @@ def update_comprehensive_employee(employee_id: str, employee_name: str | None = 
     if shift_name is not None and shift_name.strip():
         try:
             results.append(assign_shift_template_to_user(employee_id, shift_name))
-        except ValueError:
-            # If shift template doesn't exist, skip
-            pass
+        except ValueError as e:
+            # If shift template doesn't exist, create an error message but continue
+            print(f"Warning: Could not assign shift template '{shift_name}' to user '{employee_id}': {e}")
+            # Don't skip, this is a real error that should be reported
+            raise e
 
     return results

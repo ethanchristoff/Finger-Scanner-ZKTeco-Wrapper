@@ -256,11 +256,15 @@ def employee_management() -> Any:
             shift_name = request.form.get("shift_name", "").strip()
 
             if edit_emp_id:
-                # Use the new update function that only updates provided fields
-                update_comprehensive_employee(
-                    edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
-                )
-                flash(f"Employee data updated: {edit_emp_id}", "success")
+                try:
+                    update_comprehensive_employee(
+                        edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
+                    )
+                    flash(f"Employee data updated: {edit_emp_id}", "success")
+                except ValueError as e:
+                    flash(f"Error updating employee {edit_emp_id}: {e}", "error")
+                except Exception as e:
+                    flash(f"Unexpected error updating employee {edit_emp_id}: {e}", "error")
             else:
                 flash("Employee ID is required for editing.", "error")
             return redirect(url_for("employee_management"))
@@ -319,10 +323,15 @@ def unified_management() -> Any:
                 branch_name = request.form.get("branch_name", "").strip()
                 shift_name = request.form.get("shift_name", "").strip()
 
-                update_comprehensive_employee(
-                    edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
-                )
-                flash(f"Employee data updated: {edit_emp_id}", "success")
+                try:
+                    update_comprehensive_employee(
+                        edit_emp_id, employee_name if employee_name else None, designation if designation else None, branch_name if branch_name else None, shift_name if shift_name else None
+                    )
+                    flash(f"Employee data updated: {edit_emp_id}", "success")
+                except ValueError as e:
+                    flash(f"Error updating employee {edit_emp_id}: {str(e)}", "error")
+                except Exception as e:
+                    flash(f"Unexpected error updating employee {edit_emp_id}: {str(e)}", "error")
             else:
                 # Handle add action
                 employee_id = request.form.get("employee_id")
