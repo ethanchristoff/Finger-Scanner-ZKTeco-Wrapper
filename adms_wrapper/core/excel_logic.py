@@ -1,5 +1,6 @@
 import io
 from typing import Any
+from datetime import datetime, time, timedelta
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -63,23 +64,67 @@ def map_employee_name(emp_id: Any, employee_name_df: pd.DataFrame) -> str:
     return ""
 
 
-def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift_end: Any) -> str:
-    """Determine shift flag based on times."""
-    flag = "on time"
+def _to_time(obj: Any) -> time | None:
+    """Normalize various time/datetime/string inputs to a time object (HH:MM)."""
+    if pd.isna(obj) or obj is None or str(obj) == "":
+        return None
     try:
-        # Check for late check-in - now includes exact shift start time as late
-        if pd.notna(start_time) and str(start_time) != "" and str(start_time)[11:16] >= str(shift_start):
-            flag = "late in"
+        if hasattr(obj, "time") and hasattr(obj, "date"):
+            return obj.time()
+        # If it's a pandas Timestamp
+        if hasattr(obj, "hour") and hasattr(obj, "minute") and not hasattr(obj, "date"):
+            return time(int(obj.hour), int(obj.minute))
+        s = str(obj)
+        # Accept formats like '08:30:00' or '08:30'
+        s = s.strip()
+        if " " in s:
+            s = s.split(" ")[1]
+        parts = s.split(":")
+        hour = int(parts[0])
+        minute = int(parts[1]) if len(parts) > 1 else 0
+        return time(hour, minute)
+    except Exception:
+        return None
 
-        if pd.notna(end_time) and str(end_time) != "":
-            end_time_hour = end_time.hour if hasattr(end_time, "hour") else int(str(end_time)[11:13])
-            end_time_str = str(end_time)[11:16]
 
-            # Check for late checkout - now includes exact shift end time as late
-            if end_time_str >= str(shift_end) and end_time_hour < NOON_HOUR:
-                flag = "late checkout"
-            elif end_time_str < str(shift_end):
+def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift_end: Any) -> str:
+    """Determine shift flag based on times.
+
+    Statuses returned: 'normal', 'late in', 'early out', 'overtime'.
+    Rules:
+    - In is 'normal' if at or before shift_start or within 5 minutes after shift_start; otherwise 'late in'.
+    - Out is 'early out' if before shift_end.
+    - Out is 'normal' if between shift_end and shift_end + 15 minutes (inclusive).
+    - Out is 'overtime' if after shift_end + 15 minutes.
+    """
+    flag = "normal"
+    try:
+        s_time = _to_time(start_time)
+        e_time = _to_time(end_time)
+        sh_start = _to_time(shift_start)
+        sh_end = _to_time(shift_end)
+
+        # Determine late in
+        if s_time and sh_start:
+            late_in_threshold = (datetime.combine(datetime.today(), sh_start) + timedelta(minutes=5)).time()
+            # In before or equal to threshold is normal, otherwise late
+            if s_time > late_in_threshold:
+                flag = "late in"
+
+        # Determine out-related flags
+        if e_time and sh_end:
+            # early out if strictly before shift end
+            if e_time < sh_end:
                 flag = "early out"
+            else:
+                # within 15 minutes after end is normal
+                normal_out_threshold = (datetime.combine(datetime.today(), sh_end) + timedelta(minutes=15)).time()
+                if e_time <= normal_out_threshold:
+                    # keep existing flag (could be late in) or set to normal
+                    if flag != "late in":
+                        flag = "normal"
+                else:
+                    flag = "overtime"
     except Exception:
         pass
     return flag
@@ -87,14 +132,13 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
 
 def determine_no_shift_flag(end_time: Any) -> str:
     """Determine shift flag for employees with no shift assignment."""
-    flag = "on time"
+    flag = "normal"
     try:
         if pd.notna(end_time) and str(end_time) != "":
             end_time_str = str(end_time)[11:16]
-
-            # Check if checkout is exactly at 12:00 or later
+            # Use noon heuristic: checkout at or after 12:00 considered overtime
             if end_time_str >= "12:00":
-                flag = "late checkout"
+                flag = "overtime"
             elif end_time_str < "12:00":
                 flag = "early out"
     except Exception:
@@ -125,6 +169,26 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
 
     if work_status == "absent":
         return shift_name, "absent"
+
+    # If there's no end_time (only in recorded), check for shift cap: apply after 8 hours past shift end
+    if (pd.isna(end_time) or end_time is None or str(end_time) == "") and pd.notna(start_time):
+        s_time_dt = None
+        try:
+            # derive the shift end datetime using the date of start_time
+            if hasattr(start_time, "date"):
+                date_part = start_time.date()
+            else:
+                date_part = datetime.today().date()
+
+            sh_end = _to_time(shift_end)
+            if sh_end:
+                shift_end_dt = datetime.combine(date_part, sh_end)
+                cap_dt = shift_end_dt + timedelta(hours=8)
+                # If current time is after cap threshold, mark as shift_capped
+                if datetime.now() >= cap_dt:
+                    return shift_name, "shift_capped"
+        except Exception:
+            pass
 
     flag = determine_shift_flag(start_time, end_time, shift_start, shift_end)
     return shift_name, flag
@@ -443,7 +507,19 @@ def write_excel(
     wb = load_workbook(output)
 
     if "AttendanceSummary" in wb.sheetnames:
-        apply_row_highlighting(wb["AttendanceSummary"])
+        ws = wb["AttendanceSummary"]
+        apply_row_highlighting(ws)
+
+        # Configure print/page setup to better fit an A4 page for printing
+        try:
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+            ws.page_setup.paperSize = ws.PAPERSIZE_A4
+            ws.page_setup.fitToPage = True
+            ws.page_setup.fitToWidth = 1
+            ws.page_setup.fitToHeight = 0
+        except Exception:
+            # openpyxl may not support some attributes on older versions; ignore if it fails
+            pass
 
     new_output = io.BytesIO()
     wb.save(new_output)
