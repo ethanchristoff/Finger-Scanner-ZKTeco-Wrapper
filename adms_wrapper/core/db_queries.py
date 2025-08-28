@@ -1,5 +1,6 @@
 # --- User Shift Mapping ---
 
+
 def create_settings_table():
     """Create the settings table if it does not exist."""
     query = """
@@ -11,7 +12,7 @@ def create_settings_table():
     )
     """
     query_db(query)
-    
+
     # Insert default shift setting if it doesn't exist
     default_query = """
     INSERT IGNORE INTO settings (setting_key, setting_value, description)
@@ -40,12 +41,12 @@ def set_setting(setting_key: str, setting_value: str, description: str = ""):
 
 def get_default_shift() -> str:
     """Get the default shift name."""
-    return get_setting('default_shift')
+    return get_setting("default_shift")
 
 
 def set_default_shift(shift_name: str):
     """Set the default shift name."""
-    return set_setting('default_shift', shift_name, 'Default shift assigned to employees without a specific shift')
+    return set_setting("default_shift", shift_name, "Default shift assigned to employees without a specific shift")
 
 
 def create_shift_template_table():
@@ -66,30 +67,25 @@ def get_shift_templates() -> list:
     """Get all shift templates."""
     create_shift_template_table()
     result = query_db("SELECT shift_name, shift_start, shift_end, description FROM shift_template ORDER BY shift_name")
-    
+
     # Convert time objects to strings for template compatibility
     formatted_result = []
     for row in result or []:
-        formatted_row = {
-            'shift_name': row['shift_name'],
-            'shift_start': str(row['shift_start']),
-            'shift_end': str(row['shift_end']),
-            'description': row['description']
-        }
+        formatted_row = {"shift_name": row["shift_name"], "shift_start": str(row["shift_start"]), "shift_end": str(row["shift_end"]), "description": row["description"]}
         formatted_result.append(formatted_row)
-    
+
     return formatted_result
 
 
 def add_shift_template(shift_name: str, shift_start: str, shift_end: str, description: str = ""):
     """Add a shift template. Raises ValueError if shift name already exists."""
     create_shift_template_table()
-    
+
     # Check if shift template already exists
     existing = query_db("SELECT shift_name FROM shift_template WHERE shift_name = %s", (shift_name,))
     if existing:
         raise ValueError(f"Shift template '{shift_name}' already exists")
-    
+
     query = """
     INSERT INTO shift_template (shift_name, shift_start, shift_end, description)
     VALUES (%s, %s, %s, %s)
@@ -126,11 +122,11 @@ def get_user_shift_mappings() -> list:
 def add_user_shift_mapping(user_id: str, shift_name: str, shift_start: str, shift_end: str):
     """Add or update a user shift mapping."""
     create_user_shift_mapping_table()
-    
+
     # First delete any existing mapping for this user
     delete_query = "DELETE FROM user_shift_mapping WHERE user_id = %s"
     query_db(delete_query, (user_id,))
-    
+
     # Then insert the new mapping
     insert_query = """
     INSERT INTO user_shift_mapping (user_id, shift_name, shift_start, shift_end)
@@ -186,12 +182,12 @@ def get_employee_branch_mappings() -> list:
 def add_employee_branch_mapping(employee_id: str, branch_name: str):
     """Add an employee branch mapping. Raises ValueError if branch name already exists for a different employee."""
     create_employee_branch_mapping_table()
-    
+
     # Check if branch name already exists for a different employee
     existing = query_db("SELECT employee_id FROM employee_branch_mapping WHERE branch_name = %s AND employee_id != %s", (branch_name, employee_id))
     if existing:
         raise ValueError(f"Branch name '{branch_name}' already exists for another employee")
-    
+
     query = """
     INSERT INTO employee_branch_mapping (employee_id, branch_name)
     VALUES (%s, %s)
@@ -297,12 +293,12 @@ def add_employee_designation_mapping(employee_id: str, designation: str) -> list
     """Add an employee ID to designation mapping. Creates the table if it does not exist.
     Raises ValueError if designation name already exists for a different employee."""
     create_employee_designation_mapping_table()
-    
+
     # Check if designation already exists for a different employee
     existing = query_db("SELECT employee_id FROM employee_designation_mapping WHERE designation = %s AND employee_id != %s", (designation, employee_id))
     if existing:
         raise ValueError(f"Designation '{designation}' already exists for another employee")
-    
+
     query = """
     INSERT INTO employee_designation_mapping (employee_id, designation)
     VALUES (%s, %s)
@@ -342,12 +338,12 @@ def add_employee_name_mapping(employee_id: str, employee_name: str) -> list:
     """Add an employee ID to name mapping. Creates the table if it does not exist.
     Raises ValueError if employee name already exists for a different employee."""
     create_employee_name_mapping_table()
-    
+
     # Check if employee name already exists for a different employee
     existing = query_db("SELECT employee_id FROM employee_name_mapping WHERE employee_name = %s AND employee_id != %s", (employee_name, employee_id))
     if existing:
         raise ValueError(f"Employee name '{employee_name}' already exists for another employee")
-    
+
     query = """
     INSERT INTO employee_name_mapping (employee_id, employee_name)
     VALUES (%s, %s)
@@ -453,6 +449,66 @@ def add_comprehensive_employee(employee_id: str, employee_name: str = "", design
                 results.append(assign_shift_template_to_user(employee_id, default_shift))
             except ValueError:
                 # If default shift template doesn't exist, skip
+                pass
+
+    return results
+
+
+def upsert_comprehensive_employee(employee_id: str, employee_name: str = "", designation: str = "", branch_name: str = "", shift_name: str = ""):
+    """Insert or overwrite comprehensive employee data without duplicate-name/designation checks.
+
+    This is intended for bulk uploads where the incoming row should overwrite any existing
+    mappings for the given employee_id. It bypasses the checks that would raise ValueError
+    when a name or designation already exists for another employee.
+    """
+    # Ensure tables exist
+    create_employee_name_mapping_table()
+    create_employee_designation_mapping_table()
+    create_employee_branch_mapping_table()
+    create_user_shift_mapping_table()
+
+    results = []
+
+    # Upsert employee name mapping
+    if employee_name:
+        query = """
+        INSERT INTO employee_name_mapping (employee_id, employee_name)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE employee_name = VALUES(employee_name)
+        """
+        results.append(query_db(query, (employee_id, employee_name)))
+
+    # Upsert designation mapping
+    if designation:
+        query = """
+        INSERT INTO employee_designation_mapping (employee_id, designation)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE designation = VALUES(designation)
+        """
+        results.append(query_db(query, (employee_id, designation)))
+
+    # Upsert branch mapping
+    if branch_name:
+        query = """
+        INSERT INTO employee_branch_mapping (employee_id, branch_name)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE branch_name = VALUES(branch_name)
+        """
+        results.append(query_db(query, (employee_id, branch_name)))
+
+    # Assign shift similar to add_comprehensive_employee (attempt provided shift, else default)
+    if shift_name:
+        try:
+            results.append(assign_shift_template_to_user(employee_id, shift_name))
+        except ValueError:
+            # If shift template doesn't exist, skip
+            pass
+    else:
+        default_shift = get_default_shift()
+        if default_shift:
+            try:
+                results.append(assign_shift_template_to_user(employee_id, default_shift))
+            except ValueError:
                 pass
 
     return results

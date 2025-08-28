@@ -5,7 +5,6 @@ from typing import Any
 
 import pandas as pd
 from flask import Flask, flash, redirect, render_template, request, send_file, url_for
-from werkzeug.utils import secure_filename
 
 from adms_wrapper.core.data_processing import process_attendance_summary
 from adms_wrapper.core.db_queries import (
@@ -33,13 +32,12 @@ from adms_wrapper.core.db_queries import (
     get_employee_name_mappings,
     get_finger_log,
     get_migrations,
-    get_setting,
     get_shift_templates,
     get_user_shift_mappings,
     get_users,
     set_default_shift,
-    set_setting,
     update_comprehensive_employee,
+    upsert_comprehensive_employee,
 )
 from adms_wrapper.core.excel_logic import generate_attendance_summary, write_excel
 
@@ -47,8 +45,8 @@ app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
 
 # Configure upload settings
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+app.config["UPLOAD_FOLDER"] = "uploads"
 
 
 def handle_shift_mapping_deletion(delete_user_id: str) -> None:
@@ -512,7 +510,7 @@ def filter_out_sundays(summary: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     day_date = pd.to_datetime(day).date()
                 else:
                     day_date = day
-                
+
                 # Check if it's Sunday (weekday 6)
                 if pd.to_datetime(day_date).weekday() != 6:
                     filtered_summary.append(row)
@@ -522,7 +520,7 @@ def filter_out_sundays(summary: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             # Include non-date rows like subtotals
             filtered_summary.append(row)
-    
+
     return filtered_summary
 
 
@@ -579,7 +577,7 @@ def prepare_dashboard_summary(attendences: list[dict[str, Any]], shift_mappings:
         return []
 
     dashboard_summary_df = full_summary_df[(full_summary_df["work_status"] == "worked") & (full_summary_df["day"] != "Subtotal")].copy()
-    
+
     # Convert to list and filter out Sundays
     dashboard_summary = dashboard_summary_df.to_dict(orient="records")
     dashboard_summary = filter_out_sundays(dashboard_summary)
@@ -733,11 +731,11 @@ def download_filtered_attendance() -> Any:
     add_employee_name_to_summary(summary)
 
     # Create a comprehensive attendance summary that includes all dates for each employee
-    
+
     # Parse date range
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-    
+
     # Generate all dates in range (excluding Sundays)
     all_dates = []
     current_date = start_dt
@@ -745,7 +743,7 @@ def download_filtered_attendance() -> Any:
         if current_date.weekday() != 6:  # Exclude Sundays
             all_dates.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
-    
+
     # Get all unique employees from the filtered data
     if employee_id:
         # If specific employee is filtered, only include that employee
@@ -759,74 +757,69 @@ def download_filtered_attendance() -> Any:
             if emp_id and emp_id not in seen_employees:
                 all_employees.append({"employee_id": emp_id})
                 seen_employees.add(emp_id)
-    
+
     # Add employee names to the employee list
     name_mappings = get_employee_name_mappings() or []
     name_map = {str(n["employee_id"]): n["employee_name"] for n in name_mappings}
-    
+
     for emp in all_employees:
         emp["employee_name"] = name_map.get(str(emp["employee_id"]), "")
-    
+
     # Apply additional filters to employee list if specified
     if employee_name:
         all_employees = [emp for emp in all_employees if employee_name.lower() in emp["employee_name"].lower()]
-    
+
     if designation:
         designation_mappings = get_employee_designation_mappings() or []
         designation_map = {str(d["employee_id"]): d["designation"] for d in designation_mappings}
         all_employees = [emp for emp in all_employees if designation.lower() in designation_map.get(str(emp["employee_id"]), "").lower()]
-    
+
     if employee_branch:
         branch_mappings = get_employee_branch_mappings() or []
         branch_map = {str(b["employee_id"]): b["branch_name"] for b in branch_mappings}
         all_employees = [emp for emp in all_employees if employee_branch.lower() in branch_map.get(str(emp["employee_id"]), "").lower()]
-    
+
     # Create a lookup dictionary for existing attendance records
     attendance_lookup = {}
     for record in summary:
         key = f"{record.get('employee_id')}_{record.get('day')}"
         attendance_lookup[key] = record
-    
+
     # Create comprehensive attendance data
     filtered_data = []
     for employee in all_employees:
         emp_id = employee["employee_id"]
         emp_name = employee["employee_name"]
-        
+
         for date in all_dates:
             key = f"{emp_id}_{date}"
-            
+
             if key in attendance_lookup:
                 # Employee has attendance record for this date
                 record = attendance_lookup[key]
-                filtered_data.append({
-                    "Employee ID": emp_id,
-                    "Employee Name": emp_name,
-                    "Date": date,
-                    "Time In": record.get("start_time", ""),
-                    "Time Out": record.get("end_time", ""),
-                    "Shift Flag": "Yes" if record.get("shift_flag", False) else "No"
-                })
+                filtered_data.append(
+                    {
+                        "Employee ID": emp_id,
+                        "Employee Name": emp_name,
+                        "Date": date,
+                        "Time In": record.get("start_time", ""),
+                        "Time Out": record.get("end_time", ""),
+                        "Shift Flag": "Yes" if record.get("shift_flag", False) else "No",
+                    }
+                )
             else:
                 # Employee has no attendance record for this date - show as absent
-                filtered_data.append({
-                    "Employee ID": emp_id,
-                    "Employee Name": emp_name,
-                    "Date": date,
-                    "Time In": "Absent",
-                    "Time Out": "Absent",
-                    "Shift Flag": "No"
-                })
+                filtered_data.append({"Employee ID": emp_id, "Employee Name": emp_name, "Date": date, "Time In": "Absent", "Time Out": "Absent", "Shift Flag": "No"})
 
     # Create DataFrame and Excel file
     df = pd.DataFrame(filtered_data)
-    
+
     # Sort by Employee ID and Date for better organization
     df = df.sort_values(["Employee ID", "Date"])
-    
+
     # Create temporary file
-    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-        df.to_excel(tmp.name, index=False, sheet_name='Filtered Attendance')
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        df.to_excel(tmp.name, index=False, sheet_name="Filtered Attendance")
         tmp_path = tmp.name
 
     return send_file(tmp_path, as_attachment=True, download_name=f"filtered_attendance_{start_date}_to_{end_date}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -841,13 +834,13 @@ def download_employee_template() -> Any:
         {"EMP No": "002", "EMP Name": "Jane Doe", "Branch": "Branch A", "Designation": "Developer"},
         {"EMP No": "003", "EMP Name": "Bob Johnson", "Branch": "Branch B", "Designation": "Analyst"},
     ]
-    
+
     # Create DataFrame
     df = pd.DataFrame(template_data)
-    
+
     # Create temporary file
-    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-        df.to_excel(tmp.name, index=False, sheet_name='Employee Template')
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        df.to_excel(tmp.name, index=False, sheet_name="Employee Template")
         tmp_path = tmp.name
 
     return send_file(tmp_path, as_attachment=True, download_name="employee_bulk_upload_template.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -858,91 +851,91 @@ def bulk_employee_upload() -> Any:
     """Handle bulk employee upload from Excel file."""
     if request.method == "POST":
         # Check if file was uploaded
-        if 'file' not in request.files:
+        if "file" not in request.files:
             flash("No file selected. Please choose an Excel file to upload.", "error")
             return redirect(url_for("bulk_employee_upload"))
-        
-        file = request.files['file']
-        
+
+        file = request.files["file"]
+
         # Check if file has a name
-        if file.filename == '':
+        if file.filename == "":
             flash("No file selected. Please choose an Excel file to upload.", "error")
             return redirect(url_for("bulk_employee_upload"))
-        
+
         # Check if file is Excel format
-        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        if not file.filename.lower().endswith((".xlsx", ".xls")):
             flash("Invalid file format. Please upload an Excel file (.xlsx or .xls).", "error")
             return redirect(url_for("bulk_employee_upload"))
-        
+
         try:
             # Read Excel file
             df = pd.read_excel(file)
-            
+
             # Validate required columns
-            required_columns = ['EMP No', 'EMP Name', 'Branch', 'Designation']
+            required_columns = ["EMP No", "EMP Name", "Branch", "Designation"]
             missing_columns = [col for col in required_columns if col not in df.columns]
-            
+
             if missing_columns:
                 flash(f"Missing required columns: {', '.join(missing_columns)}. Please use the template file.", "error")
                 return redirect(url_for("bulk_employee_upload"))
-            
+
             # Process each row
             success_count = 0
             error_count = 0
             errors = []
-            
+
             for index, row in df.iterrows():
                 try:
-                    emp_no = str(row['EMP No']).strip()
-                    emp_name = str(row['EMP Name']).strip()
-                    branch = str(row['Branch']).strip()
-                    designation = str(row['Designation']).strip()
-                    
+                    emp_no = str(row["EMP No"]).strip()
+                    emp_name = str(row["EMP Name"]).strip()
+                    branch = str(row["Branch"]).strip()
+                    designation = str(row["Designation"]).strip()
+
                     # Validate required fields
-                    if not emp_no or emp_no == 'nan':
+                    if not emp_no or emp_no == "nan":
                         errors.append(f"Row {index + 2}: Employee Number is required")
                         error_count += 1
                         continue
-                    
-                    if not emp_name or emp_name == 'nan':
+
+                    if not emp_name or emp_name == "nan":
                         errors.append(f"Row {index + 2}: Employee Name is required")
                         error_count += 1
                         continue
-                    
-                    if not branch or branch == 'nan':
+
+                    if not branch or branch == "nan":
                         errors.append(f"Row {index + 2}: Branch is required")
                         error_count += 1
                         continue
-                    
-                    if not designation or designation == 'nan':
+
+                    if not designation or designation == "nan":
                         errors.append(f"Row {index + 2}: Designation is required")
                         error_count += 1
                         continue
-                    
-                    # Add comprehensive employee (this will handle all mappings)
-                    add_comprehensive_employee(emp_no, emp_name, designation, branch)
+
+                    # Upsert comprehensive employee (bulk upload should overwrite existing records)
+                    upsert_comprehensive_employee(emp_no, emp_name, designation, branch)
                     success_count += 1
-                    
+
                 except Exception as e:
                     errors.append(f"Row {index + 2}: {str(e)}")
                     error_count += 1
-            
+
             # Show results
             if success_count > 0:
                 flash(f"Successfully added {success_count} employee(s).", "success")
-            
+
             if error_count > 0:
                 flash(f"Failed to add {error_count} employee(s). Errors:", "error")
                 for error in errors[:5]:  # Show first 5 errors
                     flash(error, "error")
                 if len(errors) > 5:
                     flash(f"... and {len(errors) - 5} more errors.", "error")
-            
+
         except Exception as e:
             flash(f"Error reading Excel file: {str(e)}", "error")
-        
+
         return redirect(url_for("bulk_employee_upload"))
-    
+
     # GET request - show upload form
     return render_template("bulk_employee_upload.html")
 
@@ -952,22 +945,22 @@ def settings() -> Any:
     """Manage system settings like default shift."""
     if request.method == "POST":
         action = request.form.get("action")
-        
+
         if action == "set_default_shift":
             default_shift = request.form.get("default_shift")
-            
+
             if not default_shift:
                 flash("Please select a default shift", "error")
                 return redirect(url_for("settings"))
-            
+
             try:
                 set_default_shift(default_shift)
                 flash(f"Default shift set to '{default_shift}' successfully!", "success")
             except Exception as e:
                 flash(f"Error setting default shift: {e!s}", "error")
-        
+
         return redirect(url_for("settings"))
-    
+
     # GET request - show settings form
     try:
         current_default_shift = get_default_shift()
@@ -976,10 +969,8 @@ def settings() -> Any:
         flash(f"Error loading settings: {e!s}", "error")
         current_default_shift = None
         all_shifts = []
-    
-    return render_template("settings.html",
-                         current_default_shift=current_default_shift,
-                         all_shifts=all_shifts)
+
+    return render_template("settings.html", current_default_shift=current_default_shift, all_shifts=all_shifts)
 
 
 if __name__ == "__main__":

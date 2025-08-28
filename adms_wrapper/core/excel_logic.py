@@ -249,12 +249,12 @@ def create_subtotal_rows(summary_df: pd.DataFrame) -> list[dict[str, Any]]:
 
 def filter_out_sundays_from_df(df: pd.DataFrame) -> pd.DataFrame:
     """Filter out Sunday entries from a DataFrame."""
-    if df.empty or 'day' not in df.columns:
+    if df.empty or "day" not in df.columns:
         return df
-    
+
     # Create a mask to identify non-Sunday rows
-    mask = df['day'].apply(lambda day: True if day == "Subtotal" else pd.to_datetime(day).weekday() != 6)
-    
+    mask = df["day"].apply(lambda day: True if day == "Subtotal" else pd.to_datetime(day).weekday() != 6)
+
     return df[mask]
 
 
@@ -274,7 +274,7 @@ def generate_attendance_summary(
     if summary_df is not None and not summary_df.empty:
         # Filter out Sundays before applying mappings
         summary_df = filter_out_sundays_from_df(summary_df)
-        
+
         summary_df = apply_branch_mappings(summary_df)
         summary_df = apply_designation_mappings(summary_df)
         summary_df = apply_employee_branch_mappings(summary_df)
