@@ -291,13 +291,10 @@ def get_employee_designation_mappings() -> list:
 
 def add_employee_designation_mapping(employee_id: str, designation: str) -> list:
     """Add an employee ID to designation mapping. Creates the table if it does not exist.
-    Raises ValueError if designation name already exists for a different employee."""
+    This function now allows the same designation to be used by multiple employees.
+    It upserts the designation for the given employee_id.
+    """
     create_employee_designation_mapping_table()
-
-    # Check if designation already exists for a different employee
-    existing = query_db("SELECT employee_id FROM employee_designation_mapping WHERE designation = %s AND employee_id != %s", (designation, employee_id))
-    if existing:
-        raise ValueError(f"Designation '{designation}' already exists for another employee")
 
     query = """
     INSERT INTO employee_designation_mapping (employee_id, designation)
