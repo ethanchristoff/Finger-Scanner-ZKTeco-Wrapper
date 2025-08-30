@@ -180,7 +180,14 @@ def employee_name_mapping() -> Any:
         return redirect(url_for("employee_name_mapping"))
 
     mappings = get_employee_name_mappings() or []
-    return render_template("employee_name_mapping.html", mappings=mappings)
+    # Build a lookup of employee_id -> employee_name from comprehensive employee data
+    try:
+        comprehensive = get_comprehensive_employee_data() or []
+        id_to_name = {str(e.get("employee_id")): e.get("employee_name", "") for e in comprehensive if e.get("employee_id")}
+    except Exception:
+        id_to_name = {}
+
+    return render_template("employee_name_mapping.html", mappings=mappings, employee_id_to_name=id_to_name)
 
 
 def handle_employee_branch_deletion(delete_emp_id: str) -> None:
@@ -314,8 +321,21 @@ def employee_management() -> Any:
     all_employee_names = sorted({n["employee_name"] for n in get_employee_name_mappings() or []})
     shift_templates = get_shift_templates() or []
 
+    # Provide a fallback lookup of employee_id -> employee_name so templates can display names when missing
+    try:
+        name_mappings = get_employee_name_mappings() or []
+        employee_id_to_name = {str(n.get("employee_id")): n.get("employee_name", "") for n in name_mappings if n.get("employee_id")}
+    except Exception:
+        employee_id_to_name = {}
+
     return render_template(
-        "employee_management.html", employees=employees, all_branches=all_branches, all_designations=all_designations, all_employee_names=all_employee_names, shift_templates=shift_templates
+        "employee_management.html",
+        employees=employees,
+        all_branches=all_branches,
+        all_designations=all_designations,
+        all_employee_names=all_employee_names,
+        shift_templates=shift_templates,
+        employee_id_to_name=employee_id_to_name,
     )
 
 
@@ -449,6 +469,12 @@ def unified_management() -> Any:
     all_branches = sorted({b["branch_name"] for b in device_mappings})
     all_designations = sorted({d["designation"] for d in get_employee_designation_mappings() or []})
     all_employee_names = sorted({n["employee_name"] for n in get_employee_name_mappings() or []})
+    # Provide a fallback lookup of employee_id -> employee_name so templates can display names when missing
+    try:
+        name_mappings = get_employee_name_mappings() or []
+        employee_id_to_name = {str(n.get("employee_id")): n.get("employee_name", "") for n in name_mappings if n.get("employee_id")}
+    except Exception:
+        employee_id_to_name = {}
 
     return render_template(
         "unified_management.html",
@@ -458,6 +484,7 @@ def unified_management() -> Any:
         all_branches=all_branches,
         all_designations=all_designations,
         all_employee_names=all_employee_names,
+        employee_id_to_name=employee_id_to_name,
     )
 
 

@@ -498,10 +498,11 @@
                         {% for employee in employees %}
                         <div class="item-card">
                             <div class="item-header">
-                                <div class="item-title">{{ employee.employee_id }}</div>
+                                {% set resolved_name = employee.employee_name if employee.employee_name else (employee_id_to_name.get(employee.employee_id|string) if employee_id_to_name is defined else '') %}
+                                <div class="item-title">{{ resolved_name or '—' }} — <small>{{ employee.employee_id }}</small></div>
                                 <div>
                                     <button type="button" class="edit-btn" 
-                                            onclick="openEditModal('{{ employee.employee_id }}', '{{ employee.employee_name or '' }}', '{{ employee.designation or '' }}', '{{ employee.branch_name or '' }}', '{{ employee.shift_name or '' }}')">
+                                            onclick='openEditModal({{ employee.employee_id|tojson }}, {{ resolved_name|tojson }}, {{ (employee.designation or '')|tojson }}, {{ (employee.branch_name or '')|tojson }}, {{ (employee.shift_name or '')|tojson }})'>
                                         ✏️
                                     </button>
                                     <form method="POST" style="display: inline;">

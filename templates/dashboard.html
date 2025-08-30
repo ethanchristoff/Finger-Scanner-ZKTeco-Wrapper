@@ -463,7 +463,12 @@
                             <td>{{ row.designation if row.designation else '-' }}</td>
                             <td>{{ row.employee_branch if row.employee_branch else '-' }}</td>
                             <td>{{ row.day }}</td>
-                            <td>{{ row.start_time[:5] if row.start_time else '-' }}</td>
+                            <td>
+                                {{ row.start_time[:5] if row.start_time else '-' }}
+                                {% if row.late_in %}
+                                    <span class="time-flagged" title="Late check-in"> &nbsp;{{ row.late_in_time[:5] if row.late_in_time else row.start_time[:5] if row.start_time else '' }} ⚠️</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if row.shift_flag == "overtime" %}
                                     <span class="time-overtime" title="Overtime checkout - after allowed window">{{ row.end_time[:5] if row.end_time else '-' }} 🕐</span>

@@ -456,8 +456,9 @@
                             {% for employee in employees %}
                             <tr>
                                 <td><strong>{{ employee.employee_id }}</strong></td>
-                                <td class="data-cell" title="{{ employee.employee_name or 'Not set' }}">
-                                    {{ employee.employee_name or "—" }}
+                                {% set resolved_name = employee.employee_name if employee.employee_name else (employee_id_to_name.get(employee.employee_id|string) if employee_id_to_name is defined else '') %}
+                                <td class="data-cell" title="{{ resolved_name or 'Not set' }}">
+                                    {{ resolved_name or "—" }}
                                 </td>
                                 <td class="data-cell" title="{{ employee.designation or 'Not set' }}">
                                     {{ employee.designation or "—" }}
@@ -491,8 +492,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button type="button" class="edit-btn" 
-                                            onclick="openEditModal('{{ employee.employee_id }}', '{{ employee.employee_name or '' }}', '{{ employee.designation or '' }}', '{{ employee.branch_name or '' }}', '{{ employee.shift_name or '' }}')">
+                    <button type="button" class="edit-btn" 
+                        onclick='openEditModal({{ employee.employee_id|tojson }}, {{ resolved_name|tojson }}, {{ (employee.designation or '')|tojson }}, {{ (employee.branch_name or '')|tojson }}, {{ (employee.shift_name or '')|tojson }})'>
                                         ✏️ Edit
                                     </button>
                                     <form method="POST" style="display: inline;">

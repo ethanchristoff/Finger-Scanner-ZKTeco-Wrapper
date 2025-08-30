@@ -140,44 +140,98 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
         sh_start = _to_time(shift_start)
         sh_end = _to_time(shift_end)
 
-        # Determine late in
+        today = datetime.today().date()
+
+        # Build shift start/end datetimes. If shift crosses midnight (end <= start) treat end as next day.
+        sh_start_dt = datetime.combine(today, sh_start) if sh_start else None
+        sh_end_dt = datetime.combine(today, sh_end) if sh_end else None
+        if sh_start_dt and sh_end_dt and sh_end_dt <= sh_start_dt:
+            sh_end_dt = sh_end_dt + timedelta(days=1)
+
+        # Helper to convert a time to a datetime in the same logical window as the shift
+        def _to_dt_with_shift(t: time | None) -> datetime | None:
+            if not t or not sh_start_dt:
+                return datetime.combine(today, t) if t else None
+            dt = datetime.combine(today, t)
+            # If shift crosses midnight and the time is earlier than shift start, assume it's on the next day
+            if sh_end_dt and sh_end_dt.date() != sh_start_dt.date() and dt < sh_start_dt:
+                dt = dt + timedelta(days=1)
+            return dt
+
+        # Determine late in using datetimes (robust across midnight)
         if s_time and sh_start:
-            late_in_threshold = (datetime.combine(datetime.today(), sh_start) + timedelta(minutes=5)).time()
-            # In before or equal to threshold is normal, otherwise late
-            if s_time > late_in_threshold:
-                flag = "late in"
+            try:
+                s_dt = _to_dt_with_shift(s_time)
+                start_threshold = sh_start_dt + timedelta(minutes=5)
+                if s_dt and s_dt > start_threshold:
+                    flag = "late in"
+            except Exception:
+                # best-effort fallback to time-only compare
+                late_in_threshold = (datetime.combine(today, sh_start) + timedelta(minutes=5)).time()
+                if s_time > late_in_threshold:
+                    flag = "late in"
 
-        # Determine out-related flags
+        # Determine out-related flags using datetimes for correctness across midnight
         if e_time and sh_end:
-            # early out if strictly before shift end
-            if e_time < sh_end:
-                flag = "early out"
-            else:
-                # thresholds for normal and overtime
-                normal_out_threshold = (datetime.combine(datetime.today(), sh_end) + timedelta(minutes=15)).time()
-                overtime_upper_threshold = (datetime.combine(datetime.today(), sh_end) + timedelta(hours=8)).time()
-
-                # If checkout is within 15 minutes after end -> normal (unless already late in and we keep late in)
-                if e_time <= normal_out_threshold:
-                    if flag != "late in":
-                        flag = "normal"
+            try:
+                e_dt = _to_dt_with_shift(e_time)
+                # Early out: any checkout before the official shift end or before the shift start
+                # (e.g., someone checked out very early on the same day)
+                if (sh_start_dt and e_dt < sh_start_dt) or e_dt < sh_end_dt:
+                    flag = "early out"
                 else:
-                    # If checkout is after 15 minutes but within 8 hours -> overtime
-                    # If checkout is after 8 hours -> treat as shift_capped (they missed allowed checkout window)
-                    # Compare times carefully; when times cross midnight this comparison is best-effort based on same-day combine
-                    # We'll compute full datetimes to correctly compare across day boundaries
-                    try:
-                        today = datetime.today().date()
-                        e_dt = datetime.combine(today, e_time)
-                        ot_upper_dt = datetime.combine(today, sh_end) + timedelta(hours=8)
-                        normal_dt = datetime.combine(today, sh_end) + timedelta(minutes=15)
-
+                    normal_threshold_dt = sh_end_dt + timedelta(minutes=15)
+                    ot_upper_dt = sh_end_dt + timedelta(hours=8)
+                    if e_dt <= normal_threshold_dt:
+                        # Within normal grace window
+                        if flag != "late in":
+                            flag = "normal"
+                    else:
+                        # After normal grace window
                         if e_dt <= ot_upper_dt:
                             flag = "overtime"
                         else:
                             flag = "shift_capped"
+            except Exception:
+                # Fallback to original time-only logic: consider early out if checkout is before shift start or before shift end
+                try:
+                    if sh_start and e_time < sh_start:
+                        flag = "early out"
+                    elif e_time < sh_end:
+                        flag = "early out"
+                    else:
+                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                        try:
+                            if e_time <= normal_out_threshold:
+                                if flag != "late in":
+                                    flag = "normal"
+                            else:
+                                flag = "overtime"
+                        except Exception:
+                            flag = "overtime"
+                except Exception:
+                    # If we cannot compare to sh_start, fall back to previous behavior
+                    if e_time < sh_end:
+                        flag = "early out"
+                    else:
+                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                        try:
+                            if e_time <= normal_out_threshold:
+                                if flag != "late in":
+                                    flag = "normal"
+                            else:
+                                flag = "overtime"
+                        except Exception:
+                            flag = "overtime"
+                else:
+                    normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                    try:
+                        if e_time <= normal_out_threshold:
+                            if flag != "late in":
+                                flag = "normal"
+                        else:
+                            flag = "overtime"
                     except Exception:
-                        # Fallback: mark as overtime if we cannot compute datetimes
                         flag = "overtime"
     except Exception:
         pass
@@ -327,6 +381,9 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
 
     summary_df["shift_name"] = ""
     summary_df["shift_flag"] = ""
+    # New columns to track late check-ins separately from shift_flag
+    summary_df["late_in"] = False
+    summary_df["late_in_time"] = ""
 
     for idx, row in summary_df.iterrows():
         shift_capped = row.get("shift_capped", False)
@@ -339,6 +396,44 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
 
         summary_df.loc[idx, "shift_name"] = shift_name
         summary_df.loc[idx, "shift_flag"] = flag
+
+        try:
+            s_time = _to_time(row.get("start_time"))
+            sh_start = _to_time(shift_name and shift_df[shift_df["user_id"] == str(row["employee_id"])].iloc[0]["shift_start"] if not shift_df.empty and not shift_df[shift_df["user_id"] == str(row["employee_id"])].empty else shift_name and None)
+        except Exception:
+            s_time = None
+            sh_start = None
+
+        if s_time is None or sh_start is None:
+            try:
+                # Try to find shift template by name
+                if shift_name:
+                    templates = get_shift_templates() or []
+                    for t in templates:
+                        if t.get("shift_name") == shift_name:
+                            sh_start = _to_time(t.get("shift_start"))
+                            break
+            except Exception:
+                pass
+
+        late_in_flag = False
+        if s_time and sh_start:
+            try:
+                today = datetime.today().date()
+                s_dt = datetime.combine(today, s_time)
+                threshold_dt = datetime.combine(today, sh_start) + timedelta(minutes=5)
+                if s_dt > threshold_dt:
+                    late_in_flag = True
+            except Exception:
+                late_in_flag = False
+
+        summary_df.loc[idx, "late_in"] = late_in_flag
+        if late_in_flag:
+            # store a formatted time string for display
+            try:
+                summary_df.loc[idx, "late_in_time"] = s_time.strftime("%H:%M:%S") if s_time else str(row.get("start_time") or "")
+            except Exception:
+                summary_df.loc[idx, "late_in_time"] = str(row.get("start_time") or "")
 
     return summary_df
 
@@ -537,17 +632,22 @@ def apply_flag_highlighting(ws: Any) -> None:
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
         try:
             cell = row[flag_col_idx - 1]
-            val = (cell.value or "").strip().lower()
-            if val in ("overtime", "over time"):
+            val_raw = cell.value or ""
+            val = str(val_raw).strip().lower()
+
+            # Determine presence of keywords (overlapping flags allowed)
+            has_overtime = "overtime" in val or "over time" in val
+            has_late_in = "late in" in val or "latein" in val
+            has_shift_cap = "shift cap" in val or "shift_capped" in val or "shiftcap" in val
+
+            # Choose a fill with precedence: overtime > shift_capped > late_in > normal
+            if has_overtime:
                 fill = overtime_fill
-            elif val in ("late in", "latein"):
-                fill = late_fill
-            elif val in ("shift_capped", "shift cap", "shiftcap", "shift cap"):
+            elif has_shift_cap:
                 fill = shift_capped_fill
-            elif val in ("normal", "on time", "ontime"):
-                fill = normal_fill
+            elif has_late_in:
+                fill = late_fill
             else:
-                # Default to normal fill for unknown values
                 fill = normal_fill
 
             for c in row:
@@ -699,11 +799,49 @@ def write_excel(
                     "Work Status": _col_series(merged, "work_status"),
                     "In Location": _col_series(merged, "start_device_sn_branch"),
                     "Out Location": _col_series(merged, "end_device_sn_branch"),
+                    # We'll compute a combined Shift Flag that includes late-in if present
                     "Shift Flag": _col_series(merged, "shift_flag"),
                     "Total Work Dates": _col_series(merged, "days_worked"),
                     "Total Work Hours": _col_series(merged, "total_hours"),
                 }
             )
+
+            # Combine shift_flag with late_in if the latter exists so overlapping flags are visible
+            try:
+                # ensure late_in series exists
+                if "late_in" in merged.columns:
+                    late_series = merged["late_in"].fillna(False).astype(bool)
+                else:
+                    late_series = pd.Series([False] * len(merged), index=merged.index)
+
+                # get current shift flag column (may be named differently)
+                if "Shift Flag" in export_df.columns:
+                    base_flags = export_df["Shift Flag"].fillna("").astype(str)
+                else:
+                    base_flags = pd.Series([""] * len(export_df), index=export_df.index)
+
+                combined_flags = []
+                for idx, bf in base_flags.items():
+                    parts = []
+                    bf_str = str(bf).strip()
+                    if bf_str:
+                        parts.extend([p.strip() for p in bf_str.split(";") if p.strip()])
+                    if late_series.iloc[idx]:
+                        # only append 'late in' if not already present
+                        if not any(p.lower() == "late in" for p in parts):
+                            parts.append("late in")
+
+                    # normalize order: late in first if present, otherwise keep as-is
+                    if parts:
+                        combined = "; ".join(parts)
+                    else:
+                        combined = ""
+                    combined_flags.append(combined)
+
+                export_df["Shift Flag"] = pd.Series(combined_flags, index=export_df.index)
+            except Exception:
+                # If combining fails, leave the original Shift Flag column as-is
+                pass
 
         export_df.to_excel(writer, sheet_name="AttendanceSummary", index=False)
         employee_summary.to_excel(writer, sheet_name="EmployeeSummary", index=False)
