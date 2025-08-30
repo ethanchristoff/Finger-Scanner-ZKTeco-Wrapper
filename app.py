@@ -883,8 +883,25 @@ def download_filtered_attendance() -> Any:
     # Create DataFrame and Excel file
     df = pd.DataFrame(filtered_data)
 
-    # Sort by Employee ID and Date for better organization
-    df = df.sort_values(["Employee ID", "Date"])
+    # Ensure the DataFrame has the expected columns to avoid KeyError when empty
+    expected_cols = ["Employee ID", "Employee Name", "Date", "Time In", "Time Out", "Shift Flag"]
+    if df.empty:
+        # create an empty DataFrame with the expected columns so downstream operations don't fail
+        df = pd.DataFrame(columns=expected_cols)
+    else:
+        # add any missing expected columns with empty values
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = ""
+
+    # Sort by available keys (Employee ID, Date) if present
+    sort_keys = [c for c in ["Employee ID", "Date"] if c in df.columns]
+    if sort_keys:
+        try:
+            df = df.sort_values(sort_keys)
+        except Exception:
+            # If sorting fails for any reason, continue without raising
+            pass
 
     # Create temporary file and set sheet to fit A4 for printing
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:

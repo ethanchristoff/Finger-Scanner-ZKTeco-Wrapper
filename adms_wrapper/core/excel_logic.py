@@ -497,6 +497,54 @@ def apply_row_highlighting(ws: Any) -> None:
         apply_status_highlighting(row, work_status_col, shift_capped_col, green_fill, red_fill, yellow_fill)
 
 
+def apply_flag_highlighting(ws: Any) -> None:
+    """Apply highlighting based on the Shift Flag column for Excel-only exports.
+
+    Colors applied (per-row):
+    - overtime -> light orange
+    - late in -> light red/pink
+    - shift_capped -> light purple
+    - normal/other -> light green
+    """
+    # Find the column index for 'Shift Flag' (case-insensitive) and 'Shift Flag' alternatives
+    flag_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value and str(cell.value).strip().lower() in ("shift flag", "shift_flag", "shiftflag"):
+            flag_col_idx = idx
+            break
+
+    if not flag_col_idx:
+        return
+
+    # Define fills
+    overtime_fill = PatternFill(start_color="FFDFA6", end_color="FFDFA6", fill_type="solid")  # light orange
+    late_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # light red/pink
+    shift_capped_fill = PatternFill(start_color="E6E0FF", end_color="E6E0FF", fill_type="solid")  # light purple
+    normal_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # light green
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        try:
+            cell = row[flag_col_idx - 1]
+            val = (cell.value or "").strip().lower()
+            if val in ("overtime", "over time"):
+                fill = overtime_fill
+            elif val in ("late in", "latein"):
+                fill = late_fill
+            elif val in ("shift_capped", "shift cap", "shiftcap", "shift cap"):
+                fill = shift_capped_fill
+            elif val in ("normal", "on time", "ontime"):
+                fill = normal_fill
+            else:
+                # Default to normal fill for unknown values
+                fill = normal_fill
+
+            for c in row:
+                c.fill = fill
+        except Exception:
+            # If anything fails for a row, skip coloring that row
+            continue
+
+
 def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
     """Create a comprehensive summary sheet with employee statistics including days worked, subtotal hours, etc."""
     if summary_df.empty:
@@ -587,19 +635,21 @@ def write_excel(
         # Create an export-only DataFrame using the requested column order and names
         # Do not mutate `merged` (the in-memory DataFrame used by the UI)
         if merged is None:
-            export_df = pd.DataFrame(columns=[
-                "EPF Number",
-                "Employee Name",
-                "In Time",
-                "Out Time",
-                "Working Hours",
-                "Work Status",
-                "In Location",
-                "Out Location",
-                "Shift Flag",
-                "Total Work Dates",
-                "Total Work Hours",
-            ])
+            export_df = pd.DataFrame(
+                columns=[
+                    "EPF Number",
+                    "Employee Name",
+                    "In Time",
+                    "Out Time",
+                    "Working Hours",
+                    "Work Status",
+                    "In Location",
+                    "Out Location",
+                    "Shift Flag",
+                    "Total Work Dates",
+                    "Total Work Hours",
+                ]
+            )
         else:
             # Helper to safely get a column series or a blank series when missing
             def _col_series(df: pd.DataFrame, col_name: str):
@@ -630,6 +680,7 @@ def write_excel(
                 {
                     "EPF Number": _col_series(merged, "employee_id"),
                     "Employee Name": _col_series(merged, "employee_name"),
+                    "Date": _col_series(merged, "day"),
                     "In Time": _col_series(merged, "start_time"),
                     "Out Time": _col_series(merged, "end_time"),
                     "Working Hours": _col_series(merged, "time_spent"),
@@ -650,6 +701,13 @@ def write_excel(
 
     if "AttendanceSummary" in wb.sheetnames:
         ws = wb["AttendanceSummary"]
+        # Apply our excel-specific flag-based highlighting (overtime, late in, shift_capped)
+        try:
+            apply_flag_highlighting(ws)
+        except Exception:
+            # If highlighting fails, continue without breaking export
+            pass
+        # Also apply existing row highlighting for other markers (subtotals / work_status)
         apply_row_highlighting(ws)
 
         # Configure print/page setup to better fit an A4 page for printing

@@ -522,24 +522,24 @@ def delete_comprehensive_employee(employee_id: str):
 
     # Delete from all mapping tables, capture counts where possible
     try:
-        results['name'] = delete_employee_name_mapping(employee_id)
+        results["name"] = delete_employee_name_mapping(employee_id)
     except Exception as e:
-        results['name_error'] = str(e)
+        results["name_error"] = str(e)
 
     try:
-        results['designation'] = delete_employee_designation_mapping(employee_id)
+        results["designation"] = delete_employee_designation_mapping(employee_id)
     except Exception as e:
-        results['designation_error'] = str(e)
+        results["designation_error"] = str(e)
 
     try:
-        results['branch'] = delete_employee_branch_mapping(employee_id)
+        results["branch"] = delete_employee_branch_mapping(employee_id)
     except Exception as e:
-        results['branch_error'] = str(e)
+        results["branch_error"] = str(e)
 
     try:
-        results['shift'] = delete_user_shift_mapping(employee_id)
+        results["shift"] = delete_user_shift_mapping(employee_id)
     except Exception as e:
-        results['shift_error'] = str(e)
+        results["shift_error"] = str(e)
 
     return results
 
