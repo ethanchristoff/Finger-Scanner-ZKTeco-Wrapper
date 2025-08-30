@@ -513,28 +513,34 @@ def upsert_comprehensive_employee(employee_id: str, employee_name: str = "", des
 
 def delete_comprehensive_employee(employee_id: str):
     """Delete all mappings for an employee."""
-    results = []
+    # Ensure tables exist before attempting deletes
+    create_employee_name_mapping_table()
+    create_employee_designation_mapping_table()
+    create_employee_branch_mapping_table()
+    create_user_shift_mapping_table()
 
-    # Delete from all mapping tables
-    try:
-        results.append(delete_employee_name_mapping(employee_id))
-    except:
-        pass
+    results = {}
 
+    # Delete from all mapping tables, capture counts where possible
     try:
-        results.append(delete_employee_designation_mapping(employee_id))
-    except:
-        pass
-
-    try:
-        results.append(delete_employee_branch_mapping(employee_id))
-    except:
-        pass
+        results['name'] = delete_employee_name_mapping(employee_id)
+    except Exception as e:
+        results['name_error'] = str(e)
 
     try:
-        results.append(delete_user_shift_mapping(employee_id))
-    except:
-        pass
+        results['designation'] = delete_employee_designation_mapping(employee_id)
+    except Exception as e:
+        results['designation_error'] = str(e)
+
+    try:
+        results['branch'] = delete_employee_branch_mapping(employee_id)
+    except Exception as e:
+        results['branch_error'] = str(e)
+
+    try:
+        results['shift'] = delete_user_shift_mapping(employee_id)
+    except Exception as e:
+        results['shift_error'] = str(e)
 
     return results
 

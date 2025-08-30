@@ -33,17 +33,15 @@ def query_db(query, params=None):
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(query, params or ())
-        # Commit changes for modifying queries
-        try:
-            conn.commit()
-        except Exception:
-            pass
-        # Fetch results for select queries; others return empty list
-        try:
+
+        # If the query returned rows (SELECT), fetch and return them
+        if cursor.with_rows:
             results = cursor.fetchall()
-        except Exception:
-            results = []
-        return results
+            return results
+
+        # For INSERT/UPDATE/DELETE, commit and return the affected row count
+        conn.commit()
+        return cursor.rowcount
     except Error as e:
         print(f"Query failed: {e}")
         return None

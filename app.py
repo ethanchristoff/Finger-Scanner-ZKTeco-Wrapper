@@ -253,8 +253,11 @@ def employee_management() -> Any:
         if action == "delete":
             delete_emp_id = request.form.get("delete_employee_id")
             if delete_emp_id:
-                delete_comprehensive_employee(delete_emp_id)
-                flash(f"Employee data deleted: {delete_emp_id}", "success")
+                try:
+                    res = delete_comprehensive_employee(delete_emp_id)
+                    flash(f"Employee data deleted: {delete_emp_id}", "success")
+                except Exception as e:
+                    flash(f"Error deleting employee {delete_emp_id}: {str(e)}", "error")
                 return redirect(url_for("employee_management"))
 
         elif action == "edit":
@@ -292,8 +295,14 @@ def employee_management() -> Any:
             shift_name = request.form.get("shift_name", "")
 
             if employee_id:
-                add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
-                flash(f"Employee data updated: {employee_id}", "success")
+                try:
+                    add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+                    flash(f"Employee data updated: {employee_id}", "success")
+                except ValueError as e:
+                    # Known validation errors from lower layers (e.g., duplicate name)
+                    flash(f"Error adding employee {employee_id}: {str(e)}", "error")
+                except Exception as e:
+                    flash(f"Unexpected error adding employee {employee_id}: {str(e)}", "error")
             else:
                 flash("Employee ID is required.", "error")
 
@@ -320,8 +329,11 @@ def unified_management() -> Any:
             # Handle employee management
             delete_emp_id = request.form.get("delete_employee_id")
             if delete_emp_id:
-                delete_comprehensive_employee(delete_emp_id)
-                flash(f"Employee deleted: {delete_emp_id}", "success")
+                try:
+                    res = delete_comprehensive_employee(delete_emp_id)
+                    flash(f"Employee deleted: {delete_emp_id}", "success")
+                except Exception as e:
+                    flash(f"Error deleting employee {delete_emp_id}: {str(e)}", "error")
                 return redirect(url_for("unified_management"))
 
             edit_emp_id = request.form.get("edit_employee_id")
@@ -350,8 +362,13 @@ def unified_management() -> Any:
                 shift_name = request.form.get("shift_name", "")
 
                 if employee_id:
-                    add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
-                    flash(f"Employee data updated: {employee_id}", "success")
+                    try:
+                        add_comprehensive_employee(employee_id, employee_name, designation, branch_name, shift_name)
+                        flash(f"Employee data updated: {employee_id}", "success")
+                    except ValueError as e:
+                        flash(f"Error adding employee {employee_id}: {str(e)}", "error")
+                    except Exception as e:
+                        flash(f"Unexpected error adding employee {employee_id}: {str(e)}", "error")
                 else:
                     flash("Employee ID is required.", "error")
 
@@ -397,8 +414,13 @@ def unified_management() -> Any:
             designation = request.form.get("designation")
 
             if employee_id and designation:
-                add_employee_designation_mapping(employee_id, designation)
-                flash(f"Designation mapping added: {employee_id} → {designation}", "success")
+                try:
+                    add_employee_designation_mapping(employee_id, designation)
+                    flash(f"Designation mapping added: {employee_id} → {designation}", "success")
+                except ValueError as e:
+                    flash(f"Error adding designation for {employee_id}: {str(e)}", "error")
+                except Exception as e:
+                    flash(f"Unexpected error adding designation for {employee_id}: {str(e)}", "error")
             else:
                 flash("Employee ID and designation are required.", "error")
 
@@ -408,8 +430,13 @@ def unified_management() -> Any:
             employee_name = request.form.get("employee_name")
 
             if employee_id and employee_name:
-                add_employee_name_mapping(employee_id, employee_name)
-                flash(f"Employee name mapping added: {employee_id} → {employee_name}", "success")
+                try:
+                    add_employee_name_mapping(employee_id, employee_name)
+                    flash(f"Employee name mapping added: {employee_id} → {employee_name}", "success")
+                except ValueError as e:
+                    flash(f"Error adding employee name for {employee_id}: {str(e)}", "error")
+                except Exception as e:
+                    flash(f"Unexpected error adding employee name for {employee_id}: {str(e)}", "error")
             else:
                 flash("Employee ID and employee name are required.", "error")
 
@@ -785,7 +812,36 @@ def download_filtered_attendance() -> Any:
         key = f"{record.get('employee_id')}_{record.get('day')}"
         attendance_lookup[key] = record
 
-    # Create comprehensive attendance data
+    # Create comprehensive attendance data with proper shift flag labels and time formatting
+    def _format_time(v: object) -> str:
+        if v is None:
+            return ""
+        try:
+            if hasattr(v, "strftime"):
+                return v.strftime("%H:%M:%S")
+            return str(v)
+        except Exception:
+            return str(v)
+
+    def _map_shift_flag(raw_flag: object) -> str:
+        if raw_flag is None:
+            return ""
+        f = str(raw_flag).strip().lower()
+        # Normalize some names
+        if f in ("shift_capped", "shift cap", "shiftcap"):
+            return "shift cap"
+        if f in ("late in", "latein"):
+            return "late in"
+        if f in ("early out", "earlyout"):
+            return "early out"
+        if f in ("overtime", "over time"):
+            return "overtime"
+        if f in ("normal", "on time", "ontime"):
+            return "normal"
+        if f == "absent":
+            return "absent"
+        return f
+
     filtered_data = []
     for employee in all_employees:
         emp_id = employee["employee_id"]
@@ -797,19 +853,32 @@ def download_filtered_attendance() -> Any:
             if key in attendance_lookup:
                 # Employee has attendance record for this date
                 record = attendance_lookup[key]
+                start_val = record.get("start_time", "")
+                end_val = record.get("end_time", "")
+                raw_flag = record.get("shift_flag", "")
+
                 filtered_data.append(
                     {
                         "Employee ID": emp_id,
                         "Employee Name": emp_name,
                         "Date": date,
-                        "Time In": record.get("start_time", ""),
-                        "Time Out": record.get("end_time", ""),
-                        "Shift Flag": "Yes" if record.get("shift_flag", False) else "No",
+                        "Time In": _format_time(start_val) if start_val not in (None, "") else "Absent",
+                        "Time Out": _format_time(end_val) if end_val not in (None, "") else "Absent",
+                        "Shift Flag": _map_shift_flag(raw_flag),
                     }
                 )
             else:
                 # Employee has no attendance record for this date - show as absent
-                filtered_data.append({"Employee ID": emp_id, "Employee Name": emp_name, "Date": date, "Time In": "Absent", "Time Out": "Absent", "Shift Flag": "No"})
+                filtered_data.append(
+                    {
+                        "Employee ID": emp_id,
+                        "Employee Name": emp_name,
+                        "Date": date,
+                        "Time In": "Absent",
+                        "Time Out": "Absent",
+                        "Shift Flag": "absent",
+                    }
+                )
 
     # Create DataFrame and Excel file
     df = pd.DataFrame(filtered_data)
@@ -817,10 +886,29 @@ def download_filtered_attendance() -> Any:
     # Sort by Employee ID and Date for better organization
     df = df.sort_values(["Employee ID", "Date"])
 
-    # Create temporary file
+    # Create temporary file and set sheet to fit A4 for printing
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         df.to_excel(tmp.name, index=False, sheet_name="Filtered Attendance")
         tmp_path = tmp.name
+
+    # Try to adjust page setup to better fit A4 printing
+    try:
+        from openpyxl import load_workbook
+
+        wb = load_workbook(tmp_path)
+        ws = wb["Filtered Attendance"]
+        try:
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+            ws.page_setup.paperSize = ws.PAPERSIZE_A4
+            ws.page_setup.fitToPage = True
+            ws.page_setup.fitToWidth = 1
+            ws.page_setup.fitToHeight = 0
+        except Exception:
+            pass
+        wb.save(tmp_path)
+    except Exception:
+        # If openpyxl not available or fails, continue and serve the original file
+        pass
 
     return send_file(tmp_path, as_attachment=True, download_name=f"filtered_attendance_{start_date}_to_{end_date}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -879,6 +967,10 @@ def bulk_employee_upload() -> Any:
                 flash(f"Missing required columns: {', '.join(missing_columns)}. Please use the template file.", "error")
                 return redirect(url_for("bulk_employee_upload"))
 
+            # Build existing name map (name -> employee_id) to enforce unique employee names
+            existing_name_mappings = get_employee_name_mappings() or []
+            name_map = {str(n.get("employee_name", "")).strip().lower(): str(n.get("employee_id")) for n in existing_name_mappings if n.get("employee_name")}
+
             # Process each row
             success_count = 0
             error_count = 0
@@ -912,9 +1004,20 @@ def bulk_employee_upload() -> Any:
                         error_count += 1
                         continue
 
+                    # Check for duplicate employee name assigned to another employee
+                    existing = name_map.get(emp_name.strip().lower()) if emp_name else None
+                    if existing and existing != emp_no:
+                        errors.append(f"Row {index + 2}: Employee Name '{emp_name}' already exists for employee ID {existing}")
+                        error_count += 1
+                        continue
+
                     # Upsert comprehensive employee (bulk upload should overwrite existing records)
                     upsert_comprehensive_employee(emp_no, emp_name, designation, branch)
                     success_count += 1
+
+                    # Update name map so subsequent rows in the same upload see the new mapping
+                    if emp_name:
+                        name_map[emp_name.strip().lower()] = emp_no
 
                 except Exception as e:
                     errors.append(f"Row {index + 2}: {str(e)}")
@@ -975,4 +1078,4 @@ def settings() -> Any:
 
 if __name__ == "__main__":
     ensure_directories_exist()
-    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5050, debug=False, use_reloader=False)

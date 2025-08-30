@@ -21,9 +21,43 @@ def map_branch(sn: Any, mappings_df: pd.DataFrame) -> str:
     """Map device serial number to branch name."""
     if pd.isna(sn) or sn is None:
         return ""
-    row = mappings_df[mappings_df["serial_number"] == str(sn)]
-    if not row.empty:
-        return row.iloc[0]["branch_name"]
+
+    # If mappings_df is None or empty, nothing to map
+    if mappings_df is None or mappings_df.empty:
+        return ""
+
+    # Work on a copy to avoid mutating caller DataFrame
+    df = mappings_df.copy()
+
+    # Ensure expected columns exist; attempt common alternatives
+    if "serial_number" not in df.columns or "branch_name" not in df.columns:
+        rename_map = {}
+        for alt in ("serial", "sn", "device_sn", "serial_no"):
+            if alt in df.columns and "serial_number" not in df.columns:
+                rename_map[alt] = "serial_number"
+                break
+        for alt in ("branch", "branchname", "branch_name_str"):
+            if alt in df.columns and "branch_name" not in df.columns:
+                rename_map[alt] = "branch_name"
+                break
+        if rename_map:
+            df = df.rename(columns=rename_map)
+
+    if "serial_number" not in df.columns or "branch_name" not in df.columns:
+        return ""
+
+    # Compare as strings to avoid dtype mismatch
+    try:
+        sn_str = str(sn).strip()
+        match = df[df["serial_number"].astype(str).str.strip() == sn_str]
+    except Exception:
+        try:
+            match = df[df["serial_number"].astype(str).str.contains(str(sn), na=False)]
+        except Exception:
+            return ""
+
+    if not match.empty:
+        return match.iloc[0]["branch_name"]
     return ""
 
 
@@ -198,9 +232,20 @@ def apply_branch_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
     """Apply device branch mappings to summary DataFrame."""
     mappings = get_device_branch_mappings() or []
     mappings_df = pd.DataFrame(mappings)
+    # If no mappings available, set empty columns
+    if mappings_df is None or mappings_df.empty:
+        summary_df["start_device_sn_branch"] = ""
+        summary_df["end_device_sn_branch"] = ""
+        return summary_df
 
-    summary_df["start_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["start_device_sn"], mappings_df) if row["work_status"] == "worked" else "", axis=1)
-    summary_df["end_device_sn_branch"] = summary_df.apply(lambda row: map_branch(row["end_device_sn"], mappings_df) if row["work_status"] == "worked" else "", axis=1)
+    summary_df["start_device_sn_branch"] = summary_df.apply(
+        lambda row: map_branch(row.get("start_device_sn"), mappings_df) if row.get("work_status") == "worked" else "",
+        axis=1,
+    )
+    summary_df["end_device_sn_branch"] = summary_df.apply(
+        lambda row: map_branch(row.get("end_device_sn"), mappings_df) if row.get("work_status") == "worked" else "",
+        axis=1,
+    )
     return summary_df
 
 

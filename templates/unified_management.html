@@ -399,11 +399,11 @@
         </div>
         
         <div class="content">
-            {% with messages = get_flashed_messages() %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="flash-messages">
-                        {% for message in messages %}
-                            <div class="flash-message flash-success">{{ message }}</div>
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ category }}">{{ message }}</div>
                         {% endfor %}
                     </div>
                 {% endif %}
@@ -505,7 +505,7 @@
                                         ✏️
                                     </button>
                                     <form method="POST" style="display: inline;">
-                                        <input type="hidden" name="action" value="delete_employee">
+                                        <input type="hidden" name="action" value="employee">
                                         <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
                                         <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
                                     </form>
@@ -567,7 +567,7 @@
                             <div class="item-header">
                                 <div class="item-title">{{ template.shift_name }}</div>
                                 <form method="POST" style="display: inline;">
-                                    <input type="hidden" name="action" value="delete_shift_template">
+                                    <input type="hidden" name="action" value="shift_template">
                                     <input type="hidden" name="delete_shift_name" value="{{ template.shift_name }}">
                                     <button type="submit" class="delete-btn" onclick="return confirm('Delete shift template {{ template.shift_name }}?')">🗑️</button>
                                 </form>
@@ -615,7 +615,7 @@
                             <div class="item-header">
                                 <div class="item-title">{{ mapping.serial_number }}</div>
                                 <form method="POST" style="display: inline;">
-                                    <input type="hidden" name="action" value="delete_device_branch">
+                                    <input type="hidden" name="action" value="device_branch">
                                     <input type="hidden" name="delete_serial_number" value="{{ mapping.serial_number }}">
                                     <button type="submit" class="delete-btn" onclick="return confirm('Delete device mapping {{ mapping.serial_number }}?')">🗑️</button>
                                 </form>
