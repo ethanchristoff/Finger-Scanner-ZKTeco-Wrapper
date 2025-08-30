@@ -584,7 +584,65 @@ def write_excel(
         pd.DataFrame(finger_logs).to_excel(writer, sheet_name="FingerLogs", index=False)
         pd.DataFrame(migration_logs).to_excel(writer, sheet_name="Migrations", index=False)
         pd.DataFrame(user_logs).to_excel(writer, sheet_name="Users", index=False)
-        merged.to_excel(writer, sheet_name="AttendanceSummary", index=False)
+        # Create an export-only DataFrame using the requested column order and names
+        # Do not mutate `merged` (the in-memory DataFrame used by the UI)
+        if merged is None:
+            export_df = pd.DataFrame(columns=[
+                "EPF Number",
+                "Employee Name",
+                "In Time",
+                "Out Time",
+                "Working Hours",
+                "Work Status",
+                "In Location",
+                "Out Location",
+                "Shift Flag",
+                "Total Work Dates",
+                "Total Work Hours",
+            ])
+        else:
+            # Helper to safely get a column series or a blank series when missing
+            def _col_series(df: pd.DataFrame, col_name: str):
+                if col_name in df.columns:
+                    return df[col_name]
+                # Try some common alternative column names
+                alt_map = {
+                    "employee_id": ["EPF Number", "EPF No", "employee_id"],
+                    "employee_name": ["Employee Name", "employee_name"],
+                    "start_time": ["start_time", "In Time", "in_time"],
+                    "end_time": ["end_time", "Out Time", "out_time"],
+                    "time_spent": ["time_spent", "Working Hours", "working_hours"],
+                    "work_status": ["work_status", "Work Status"],
+                    "start_device_sn_branch": ["start_device_sn_branch", "In Location"],
+                    "end_device_sn_branch": ["end_device_sn_branch", "Out Location"],
+                    "shift_flag": ["shift_flag", "Shift Flag"],
+                    "days_worked": ["days_worked", "Total Work Dates"],
+                    "total_hours": ["total_hours", "Total Work Hours"],
+                }
+                # If df has any of the mapped alternatives, return it
+                for alt in alt_map.get(col_name, []):
+                    if alt in df.columns:
+                        return df[alt]
+                # Otherwise return blank series matching the length
+                return pd.Series([""] * len(df), index=df.index)
+
+            export_df = pd.DataFrame(
+                {
+                    "EPF Number": _col_series(merged, "employee_id"),
+                    "Employee Name": _col_series(merged, "employee_name"),
+                    "In Time": _col_series(merged, "start_time"),
+                    "Out Time": _col_series(merged, "end_time"),
+                    "Working Hours": _col_series(merged, "time_spent"),
+                    "Work Status": _col_series(merged, "work_status"),
+                    "In Location": _col_series(merged, "start_device_sn_branch"),
+                    "Out Location": _col_series(merged, "end_device_sn_branch"),
+                    "Shift Flag": _col_series(merged, "shift_flag"),
+                    "Total Work Dates": _col_series(merged, "days_worked"),
+                    "Total Work Hours": _col_series(merged, "total_hours"),
+                }
+            )
+
+        export_df.to_excel(writer, sheet_name="AttendanceSummary", index=False)
         employee_summary.to_excel(writer, sheet_name="EmployeeSummary", index=False)
 
     output.seek(0)
