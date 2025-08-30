@@ -447,11 +447,15 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
     shift_capped_col = None
 
     for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == "day":
+        if cell.value is None:
+            continue
+        header = str(cell.value).strip().lower()
+        # Accept both 'day' and common export header 'date'
+        if header in ("day", "date"):
             day_col = idx
-        if cell.value == "work_status":
+        if header in ("work_status", "work status", "workstatus"):
             work_status_col = idx
-        if cell.value == "shift_capped":
+        if header in ("shift_capped", "shift capped", "shiftcap"):
             shift_capped_col = idx
 
     return day_col, work_status_col, shift_capped_col
@@ -459,9 +463,17 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
 
 def apply_subtotal_highlighting(row: list, day_col: int | None, blue_fill: PatternFill) -> None:
     """Apply highlighting for subtotal rows."""
-    if day_col and row[day_col - 1].value == "Subtotal":
-        for cell in row:
-            cell.fill = blue_fill
+    if not day_col:
+        return
+    try:
+        cell_val = row[day_col - 1].value
+        if cell_val is None:
+            return
+        if str(cell_val).strip().lower() == "subtotal":
+            for cell in row:
+                cell.fill = blue_fill
+    except Exception:
+        return
 
 
 def apply_status_highlighting(row: list, work_status_col: int | None, shift_capped_col: int | None, green_fill: PatternFill, red_fill: PatternFill, yellow_fill: PatternFill) -> None:
