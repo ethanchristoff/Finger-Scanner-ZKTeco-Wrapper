@@ -213,9 +213,10 @@
             font-size: 0.6875rem;
         }
         .badge-capped { background: #742a2a; color: #feb2b2; }
-        .badge-auto { background: #744210; color: #fbd38d; }
-        .badge-flagged { background: #2a4365; color: #90cdf4; }
-        .badge-late-checkout { background: #d69e2e; color: #faf089; }
+    .badge-auto { background: #744210; color: #fbd38d; }
+    .badge-flagged { background: #2a4365; color: #90cdf4; }
+    .badge-overtime { background: #d69e2e; color: #faf089; }
+    .badge-late-in { background: #d53f8c; color: #f687b3; }
         .table-container {
             background: #1a202c;
             border-radius: 12px;
@@ -260,7 +261,8 @@
         }
         .status-normal { background: #276749; color: #9ae6b4; }
         .status-capped { background: #742a2a; color: #feb2b2; }
-        .status-late-checkout { background: #d69e2e; color: #faf089; }
+    .status-late-checkout { background: #d69e2e; color: #faf089; }
+    .status-overtime { background: #d69e2e; color: #faf089; }
         .status-late-in { background: #d53f8c; color: #f687b3; }
         .status-early-out { background: #4299e1; color: #90cdf4; }
         .time-flagged { 
@@ -268,6 +270,10 @@
             font-weight: 600;
         }
         .time-late-checkout {
+            color: #d69e2e;
+            font-weight: 600;
+        }
+        .time-overtime {
             color: #d69e2e;
             font-weight: 600;
         }
@@ -411,8 +417,12 @@
                         <span>Work hours limited by shift schedule</span>
                     </div>
                     <div class="legend-item">
-                        <span class="legend-badge badge-late-checkout">LATE CHECKOUT</span>
-                        <span>Checked out after shift end but before noon</span>
+                        <span class="legend-badge badge-overtime">OVERTIME</span>
+                        <span>Checked out after shift end (counts as overtime)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-badge badge-late-in">LATE IN</span>
+                        <span>Checked in after allowed grace period</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-badge badge-auto">AUTO END</span>
@@ -455,8 +465,8 @@
                             <td>{{ row.day }}</td>
                             <td>{{ row.start_time[:5] if row.start_time else '-' }}</td>
                             <td>
-                                {% if row.shift_flag == "late checkout" %}
-                                    <span class="time-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">{{ row.end_time[:5] if row.end_time else '-' }} 🕐</span>
+                                {% if row.shift_flag == "overtime" %}
+                                    <span class="time-overtime" title="Overtime checkout - after allowed window">{{ row.end_time[:5] if row.end_time else '-' }} 🕐</span>
                                 {% elif row.end_time and row.end_time == '23:59:59' %}
                                     <span class="time-auto" title="Auto-calculated end time">{{ row.end_time[:5] if row.end_time else '-' }} ⏰</span>
                                 {% else %}
@@ -464,8 +474,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.shift_flag == "late checkout" %}
-                                    <span class="time-late-checkout" title="Actual time worked including late checkout (at or past shift end/12:00)">{{ row.time_spent }} 🔄</span>
+                                {% if row.shift_flag == "overtime" %}
+                                    <span class="time-overtime" title="Actual time worked including overtime">{{ row.time_spent }} 🔄</span>
                                 {% elif row.shift_capped %}
                                     <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
                                 {% elif row.end_time and row.end_time == '23:59:59' %}
@@ -483,16 +493,16 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.shift_flag == "late checkout" %}
-                                    <span class="status-badge status-late-checkout" title="Late checkout - at or past shift end (or 12:00 if no shift)">LATE CHECKOUT</span>
+                                {% if row.shift_flag == "overtime" %}
+                                    <span class="status-badge status-overtime" title="Overtime checkout">OVERTIME</span>
                                 {% elif row.shift_flag == "late in" %}
-                                    <span class="status-badge status-late-in" title="Late check-in - at or after shift start time">LATE IN</span>
+                                    <span class="status-badge status-late-in" title="Late check-in - after grace period">LATE IN</span>
                                 {% elif row.shift_flag == "early out" %}
                                     <span class="status-badge status-early-out">EARLY OUT</span>
                                 {% elif row.shift_capped %}
                                     <span class="status-badge status-capped">SHIFT CAPPED</span>
-                                {% elif row.shift_flag == "on time" %}
-                                    <span class="status-badge status-normal">ON TIME</span>
+                                {% elif row.shift_flag == "normal" %}
+                                    <span class="status-badge status-normal">NORMAL</span>
                                 {% else %}
                                     <span class="status-badge status-normal">NORMAL</span>
                                 {% endif %}

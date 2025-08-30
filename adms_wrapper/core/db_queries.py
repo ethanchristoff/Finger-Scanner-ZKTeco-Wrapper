@@ -180,13 +180,12 @@ def get_employee_branch_mappings() -> list:
 
 
 def add_employee_branch_mapping(employee_id: str, branch_name: str):
-    """Add an employee branch mapping. Raises ValueError if branch name already exists for a different employee."""
-    create_employee_branch_mapping_table()
+    """Add or update an employee branch mapping. Multiple employees may share the same branch.
 
-    # Check if branch name already exists for a different employee
-    existing = query_db("SELECT employee_id FROM employee_branch_mapping WHERE branch_name = %s AND employee_id != %s", (branch_name, employee_id))
-    if existing:
-        raise ValueError(f"Branch name '{branch_name}' already exists for another employee")
+    This function upserts the branch_name for the given employee_id. It no longer enforces
+    uniqueness of branch names across employees.
+    """
+    create_employee_branch_mapping_table()
 
     query = """
     INSERT INTO employee_branch_mapping (employee_id, branch_name)

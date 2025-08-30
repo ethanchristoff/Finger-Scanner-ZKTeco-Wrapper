@@ -12,6 +12,8 @@ from adms_wrapper.core.db_queries import (
     get_employee_branch_mappings,
     get_employee_designation_mappings,
     get_employee_name_mappings,
+    get_shift_templates,
+    get_default_shift,
 )
 
 NOON_HOUR = 12
@@ -151,30 +153,53 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
             if e_time < sh_end:
                 flag = "early out"
             else:
-                # within 15 minutes after end is normal
+                # thresholds for normal and overtime
                 normal_out_threshold = (datetime.combine(datetime.today(), sh_end) + timedelta(minutes=15)).time()
+                overtime_upper_threshold = (datetime.combine(datetime.today(), sh_end) + timedelta(hours=8)).time()
+
+                # If checkout is within 15 minutes after end -> normal (unless already late in and we keep late in)
                 if e_time <= normal_out_threshold:
-                    # keep existing flag (could be late in) or set to normal
                     if flag != "late in":
                         flag = "normal"
                 else:
-                    flag = "overtime"
+                    # If checkout is after 15 minutes but within 8 hours -> overtime
+                    # If checkout is after 8 hours -> treat as shift_capped (they missed allowed checkout window)
+                    # Compare times carefully; when times cross midnight this comparison is best-effort based on same-day combine
+                    # We'll compute full datetimes to correctly compare across day boundaries
+                    try:
+                        today = datetime.today().date()
+                        e_dt = datetime.combine(today, e_time)
+                        ot_upper_dt = datetime.combine(today, sh_end) + timedelta(hours=8)
+                        normal_dt = datetime.combine(today, sh_end) + timedelta(minutes=15)
+
+                        if e_dt <= ot_upper_dt:
+                            flag = "overtime"
+                        else:
+                            flag = "shift_capped"
+                    except Exception:
+                        # Fallback: mark as overtime if we cannot compute datetimes
+                        flag = "overtime"
     except Exception:
         pass
     return flag
 
 
 def determine_no_shift_flag(end_time: Any) -> str:
-    """Determine shift flag for employees with no shift assignment."""
+    """Determine shift flag for employees with no shift assignment.
+
+    This function is kept for backward compatibility, but the main code now prefers using
+    a configurable default shift from settings (if present) or falling back to 08:00-17:30.
+    """
     flag = "normal"
     try:
         if pd.notna(end_time) and str(end_time) != "":
-            end_time_str = str(end_time)[11:16]
-            # Use noon heuristic: checkout at or after 12:00 considered overtime
-            if end_time_str >= "12:00":
-                flag = "overtime"
-            elif end_time_str < "12:00":
-                flag = "early out"
+            end_time_obj = _to_time(end_time)
+            if end_time_obj:
+                # If checkout is in the afternoon, consider overtime; otherwise early out
+                if end_time_obj >= time(12, 0):
+                    flag = "overtime"
+                else:
+                    flag = "early out"
     except Exception:
         pass
     return flag
@@ -182,50 +207,64 @@ def determine_no_shift_flag(end_time: Any) -> str:
 
 def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, end_time: Any, shift_df: pd.DataFrame) -> tuple[str, str]:
     """Get shift information for an employee without shift_capped parameter."""
-    if shift_df.empty:
-        # No shift data available - use no-shift logic
-        if work_status == "absent":
-            return "", "absent"
-        flag = determine_no_shift_flag(end_time)
-        return "", flag
+    # Determine shift template to use: prefer assigned shift in shift_df; else use configured default
+    chosen_shift_name = ""
+    chosen_shift_start = None
+    chosen_shift_end = None
 
-    shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
-    if shift_row.empty:
-        # Employee has no assigned shift - use no-shift logic
-        if work_status == "absent":
-            return "", "absent"
-        flag = determine_no_shift_flag(end_time)
-        return "", flag
+    # Try to find assigned shift
+    if not shift_df.empty:
+        shift_row = shift_df[shift_df["user_id"] == str(emp_id)]
+        if not shift_row.empty:
+            chosen_shift_name = shift_row.iloc[0]["shift_name"]
+            chosen_shift_start = shift_row.iloc[0]["shift_start"]
+            chosen_shift_end = shift_row.iloc[0]["shift_end"]
 
-    shift_name = shift_row.iloc[0]["shift_name"]
-    shift_start = shift_row.iloc[0]["shift_start"]
-    shift_end = shift_row.iloc[0]["shift_end"]
+    # If no assigned shift, try configured default shift template
+    if not chosen_shift_start or not chosen_shift_end:
+        default_shift_name = get_default_shift() or ""
+        if default_shift_name:
+            # Look up template by name
+            try:
+                templates = get_shift_templates() or []
+                for t in templates:
+                    if t.get("shift_name") == default_shift_name:
+                        chosen_shift_name = t.get("shift_name")
+                        chosen_shift_start = t.get("shift_start")
+                        chosen_shift_end = t.get("shift_end")
+                        break
+            except Exception:
+                pass
+
+    # If still missing, fall back to 08:00 - 17:30 default
+    if not chosen_shift_start or not chosen_shift_end:
+        chosen_shift_name = chosen_shift_name or "Default"
+        chosen_shift_start = chosen_shift_start or time(8, 0)
+        chosen_shift_end = chosen_shift_end or time(17, 30)
 
     if work_status == "absent":
-        return shift_name, "absent"
+        return chosen_shift_name, "absent"
 
-    # If there's no end_time (only in recorded), check for shift cap: apply after 8 hours past shift end
+    # If there's no end_time but there is a start_time, check for shift cap (no checkout within 8 hours after shift end)
     if (pd.isna(end_time) or end_time is None or str(end_time) == "") and pd.notna(start_time):
-        s_time_dt = None
         try:
-            # derive the shift end datetime using the date of start_time
             if hasattr(start_time, "date"):
                 date_part = start_time.date()
             else:
                 date_part = datetime.today().date()
 
-            sh_end = _to_time(shift_end)
+            sh_end = _to_time(chosen_shift_end)
             if sh_end:
                 shift_end_dt = datetime.combine(date_part, sh_end)
                 cap_dt = shift_end_dt + timedelta(hours=8)
-                # If current time is after cap threshold, mark as shift_capped
                 if datetime.now() >= cap_dt:
-                    return shift_name, "shift_capped"
+                    return chosen_shift_name, "shift_capped"
         except Exception:
             pass
 
-    flag = determine_shift_flag(start_time, end_time, shift_start, shift_end)
-    return shift_name, flag
+    # If an end_time exists, check whether it's within the 8-hour window; determine_shift_flag will classify early/normal/overtime/shift_capped
+    flag = determine_shift_flag(start_time, end_time, chosen_shift_start, chosen_shift_end)
+    return chosen_shift_name, flag
 
 
 def apply_branch_mappings(summary_df: pd.DataFrame) -> pd.DataFrame:
