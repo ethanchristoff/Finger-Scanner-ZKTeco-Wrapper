@@ -43,10 +43,14 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
     employee_id = row["employee_id"]
     day = row["day"]
 
-    if pd.isna(start_time) or pd.isna(end_time):
+    # If there's no start time, nothing to compute
+    if pd.isna(start_time):
         return "0:00:00", False, end_time
 
-    time_diff = end_time - start_time
+    # end_time may be NaT (no checkout) — handle below depending on shift presence
+    time_diff = None
+    if pd.notna(end_time):
+        time_diff = end_time - start_time
 
     # Check if it's a weekend
     day_date = pd.to_datetime(day)
@@ -64,16 +68,25 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         shift_start_dt = pd.to_datetime(f"{day} {shift_start}")
         shift_end_dt = pd.to_datetime(f"{day} {shift_end}")
 
-        # Calculate expected shift duration
+        # Calculate expected shift duration and cap datetime (shift end + 8 hours)
         expected_duration = shift_end_dt - shift_start_dt
+        cap_dt = shift_end_dt + timedelta(hours=8)
 
-        # If actual time is greater than expected, cap it and set flag
-        if time_diff > expected_duration:
-            time_spent_str = str(expected_duration).split(".")[0]
-            return time_spent_str, True, end_time  # Keep actual end_time, only cap the time_spent
-        else:
-            time_spent_str = str(time_diff).split(".")[0]
-            return time_spent_str, False, end_time
+        # If there's no recorded checkout (end_time is NaT), treat as shift_capped and set end_time to cap_dt
+        if pd.isna(end_time):
+            time_spent_td = cap_dt - start_time
+            time_spent_str = str(time_spent_td).split(".")[0]
+            return time_spent_str, True, cap_dt
+
+        # If the recorded checkout is at or after the cap time, treat as shift_capped and use cap_dt as the effective end
+        if end_time >= cap_dt:
+            time_spent_td = cap_dt - start_time
+            time_spent_str = str(time_spent_td).split(".")[0]
+            return time_spent_str, True, cap_dt
+
+        # Otherwise, the employee checked out before the cap — compute actual worked time (may include overtime)
+        time_spent_str = str(time_diff).split(".")[0]
+        return time_spent_str, False, end_time
     else:
         # No shift assigned - apply 8-hour cap
         eight_hours = timedelta(hours=8)
