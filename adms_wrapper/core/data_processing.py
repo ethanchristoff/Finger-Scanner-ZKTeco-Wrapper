@@ -46,6 +46,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
     end_time = row["end_time"]
     employee_id = row["employee_id"]
     day = row["day"]
+    forced_no_checkout = bool(row.get("forced_no_checkout", False))
 
     # If there's no start time, nothing to compute
     if pd.isna(start_time):
@@ -84,10 +85,14 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
 
         # If there's no recorded checkout (end_time is NaT), treat as no_checkout
         # and set end_time to the grace deadline for time counting (employee didn't checkout)
-        if pd.isna(end_time):
-            # If start_time is after grace_dt for some odd reason, count from start_time to start_time (0)
-            end_use = grace_dt if grace_dt > start_time else start_time
-            time_spent_td = end_use - start_time
+        if pd.isna(end_time) or forced_no_checkout:
+            # If forced_no_checkout, close at scheduled shift_end (end_use set to shift_end_dt)
+            if forced_no_checkout:
+                end_use = shift_end_dt
+            else:
+                # If start_time is after grace_dt for some odd reason, count from start_time to start_time (0)
+                end_use = grace_dt if grace_dt > start_time else start_time
+            time_spent_td = end_use - start_time if end_use and end_use > start_time else timedelta(0)
             time_spent_str = str(time_spent_td).split(".")[0]
             return time_spent_str, True, end_use
 
@@ -316,6 +321,8 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
                 # Next shift start is shift_start on the following day
                 next_shift_start_dt = shift_start_dt + timedelta(days=1)
                 boundary_dt = next_shift_start_dt
+                # early-in window start: timestamps at or after this are considered early check-ins for the next shift
+                early_in_window_start = next_shift_start_dt - timedelta(minutes=30)
             else:
                 # For employees without a shift mapping, allow any subsequent timestamp to be considered a checkout
                 boundary_dt = None
@@ -330,6 +337,11 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
                     continue
                 if boundary_dt is not None and ts_j >= boundary_dt:
                     # This timestamp belongs to the next shift window; stop searching
+                    break
+                # If this timestamp falls into the early-in window for the next shift, treat it as a start
+                # for the next shift rather than a checkout for the current shift.
+                if boundary_dt is not None and ts_j >= early_in_window_start:
+                    # stop searching and do not treat this as a checkout
                     break
                 # keep the latest found before the boundary
                 candidate_index = j
@@ -353,17 +365,29 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
                 # consume up to candidate_index
                 i = candidate_index + 1
             else:
-                # No checkout within cap window -> leave end_time as NaT so cap logic will apply later
+                # No checkout within cap window -> check if the next timestamp exists and falls into the early-in window
+                # If so, treat the next timestamp as an early check-in for the next shift. Close this shift at shift_end_dt
+                # and mark it as a forced no-checkout (so time is counted up to shift_end but it's flagged as no_checkout).
+                forced_no_checkout = False
+                end_use = pd.NaT
+                if i + 1 < n and boundary_dt is not None:
+                    next_ts = emp_df_sorted.loc[i + 1, "timestamp"]
+                    if next_ts >= early_in_window_start:
+                        # Close previous shift at its scheduled end
+                        forced_no_checkout = True
+                        end_use = shift_end_dt
+
                 worked_rows.append(
                     {
                         "employee_id": emp,
                         "day": st.date(),
                         "start_time": st,
-                        "end_time": pd.NaT,
+                        "end_time": end_use if forced_no_checkout else pd.NaT,
                         "start_device_sn": st_row.get("sn", ""),
-                        "end_device_sn": "",
+                        "end_device_sn": emp_df_sorted.loc[i + 1, "sn"] if forced_no_checkout and i + 1 < n else "",
                         "work_status": "worked",
                         "num_entries": 1,
+                        "forced_no_checkout": forced_no_checkout,
                     }
                 )
                 # move to next timestamp which will be treated as next shift's start
