@@ -36,6 +36,8 @@ from adms_wrapper.core.db_queries import (
     get_user_shift_mappings,
     get_users,
     set_default_shift,
+    get_setting,
+    set_setting,
     update_comprehensive_employee,
     upsert_comprehensive_employee,
 )
@@ -1110,18 +1112,52 @@ def settings() -> Any:
             except Exception as e:
                 flash(f"Error setting default shift: {e!s}", "error")
 
+        if action == "set_shift_settings":
+            # Save shift-related numeric settings
+            shift_cap_hours = request.form.get("shift_cap_hours")
+            early_checkin_minutes = request.form.get("early_checkin_minutes")
+            errors = False
+            try:
+                if shift_cap_hours is not None and str(shift_cap_hours).strip() != "":
+                    int(shift_cap_hours)
+                    set_setting("shift_cap_hours", str(shift_cap_hours), "Hours after shift end to consider no-checkout / shift capped")
+            except Exception:
+                flash("shift_cap_hours must be an integer", "error")
+                errors = True
+
+            try:
+                if early_checkin_minutes is not None and str(early_checkin_minutes).strip() != "":
+                    int(early_checkin_minutes)
+                    set_setting("early_checkin_minutes", str(early_checkin_minutes), "Minutes before shift start to treat check-in as early in")
+            except Exception:
+                flash("early_checkin_minutes must be an integer", "error")
+                errors = True
+
+            if not errors:
+                flash("Shift settings saved successfully", "success")
+
         return redirect(url_for("settings"))
 
     # GET request - show settings form
     try:
         current_default_shift = get_default_shift()
         all_shifts = get_shift_templates()
+        current_shift_cap = get_setting("shift_cap_hours") or "8"
+        current_early_checkin = get_setting("early_checkin_minutes") or "30"
     except Exception as e:
         flash(f"Error loading settings: {e!s}", "error")
         current_default_shift = None
         all_shifts = []
+        current_shift_cap = "8"
+        current_early_checkin = "30"
 
-    return render_template("settings.html", current_default_shift=current_default_shift, all_shifts=all_shifts)
+    return render_template(
+        "settings.html",
+        current_default_shift=current_default_shift,
+        all_shifts=all_shifts,
+        current_shift_cap=current_shift_cap,
+        current_early_checkin=current_early_checkin,
+    )
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from adms_wrapper.core.db_queries import (
     get_employee_name_mappings,
     get_shift_templates,
     get_default_shift,
+    get_setting,
 )
 
 NOON_HOUR = 12
@@ -162,7 +163,12 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
         if s_time and sh_start:
             try:
                 s_dt = _to_dt_with_shift(s_time)
-                early_threshold = sh_start_dt - timedelta(minutes=30)
+                # Use configurable early-in window from settings (minutes before shift to consider early)
+                try:
+                    early_minutes = int(get_setting("early_checkin_minutes") or 30)
+                except Exception:
+                    early_minutes = 30
+                early_threshold = sh_start_dt - timedelta(minutes=early_minutes)
                 late_threshold = sh_start_dt + timedelta(minutes=5)
                 if s_dt and s_dt < early_threshold:
                     # Checked in 30+ minutes before shift start -> early in
@@ -308,7 +314,7 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
     if work_status == "absent":
         return chosen_shift_name, "absent"
 
-    # If there's no end_time but there is a start_time, check for shift cap (no checkout within 8 hours after shift end)
+    # If there's no end_time but there is a start_time, check for shift cap (no checkout within configured hours after shift end)
     if (pd.isna(end_time) or end_time is None or str(end_time) == "") and pd.notna(start_time):
         try:
             if hasattr(start_time, "date"):
@@ -319,7 +325,11 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
             sh_end = _to_time(chosen_shift_end)
             if sh_end:
                 shift_end_dt = datetime.combine(date_part, sh_end)
-                cap_dt = shift_end_dt + timedelta(hours=8)
+                try:
+                    cap_hours = int(get_setting("shift_cap_hours") or 8)
+                except Exception:
+                    cap_hours = 8
+                cap_dt = shift_end_dt + timedelta(hours=cap_hours)
                 if datetime.now() >= cap_dt:
                     return chosen_shift_name, "no checkout"
         except Exception:

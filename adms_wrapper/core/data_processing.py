@@ -104,12 +104,12 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
             except Exception:
                 # if adjustment fails, leave as-is
                 pass
-        # If employee checked out after shift_end_dt
-        if end_time > shift_end_dt:
-            # Count every minute up to actual checkout as part of shift (late checkout)
-            time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
+
+        # If the recorded checkout is at or after the cap time, treat as shift_capped and use cap_dt as the effective end
+        if end_time >= cap_dt:
+            time_spent_td = cap_dt - start_time
             time_spent_str = str(time_spent_td).split(".")[0]
-            return time_spent_str, False, end_time
+            return time_spent_str, True, cap_dt
 
         # Otherwise, the employee checked out before or at shift end — normal/early out
         time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
@@ -134,9 +134,8 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
                 pass
 
         if time_diff and time_diff > eight_hours:
-            # Actual checkout exists beyond 8 hours: count full worked time and do not mark as shift_capped
-            time_spent_str = str(time_diff).split(".")[0]
-            return time_spent_str, False, end_time
+            time_spent_str = str(eight_hours).split(".")[0]
+            return time_spent_str, True, start_time + eight_hours
 
         time_spent_str = str(time_diff).split(".")[0]
         return time_spent_str, False, end_time

@@ -19,6 +19,20 @@ def create_settings_table():
     VALUES ('default_shift', '', 'Default shift assigned to employees without a specific shift')
     """
     query_db(default_query)
+    # Insert default shift-related settings if they don't exist
+    # shift_cap_hours: how many hours after shift end before marking as 'no checkout' (default 8)
+    cap_query = """
+    INSERT IGNORE INTO settings (setting_key, setting_value, description)
+    VALUES ('shift_cap_hours', '8', 'Hours after shift end to consider no-checkout / shift capped')
+    """
+    query_db(cap_query)
+
+    # early_checkin_minutes: minutes before shift start that count as an early check-in (default 30)
+    early_query = """
+    INSERT IGNORE INTO settings (setting_key, setting_value, description)
+    VALUES ('early_checkin_minutes', '30', 'Minutes before shift start to treat check-in as early in')
+    """
+    query_db(early_query)
 
 
 def get_setting(setting_key: str) -> str:

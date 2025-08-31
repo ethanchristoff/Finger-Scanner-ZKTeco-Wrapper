@@ -285,6 +285,33 @@
             </div>
             
             <div class="settings-section">
+                <h3>⏱️ Shift Timing & Grace Periods</h3>
+                <p>Configure how the system treats missing checkouts and early check-ins.</p>
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="set_shift_settings">
+
+                    <div class="form-group">
+                        <label for="shift_cap_hours">Shift cap hours (no-checkout threshold):</label>
+                        <input type="number" name="shift_cap_hours" id="shift_cap_hours" min="1" step="1" value="{{ current_shift_cap }}" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="early_checkin_minutes">Early check-in window (minutes before shift start):</label>
+                        <input type="number" name="early_checkin_minutes" id="early_checkin_minutes" min="0" step="1" value="{{ current_early_checkin }}" />
+                    </div>
+
+                    <button type="submit" class="btn">💾 Save Shift Settings</button>
+                </form>
+
+                <div class="info-box">
+                    <strong>ℹ️ Notes:</strong>
+                    • <em>Shift cap hours</em> controls how long after a shift's scheduled end the system will wait before marking a worked day as "no checkout". Default is 8 hours.<br>
+                    • <em>Early check-in window</em> controls how many minutes before shift start a check-in is considered an "early in". Default is 30 minutes.
+                </div>
+            </div>
+            
+            <div class="settings-section">
                 <h3>🔒 Duplicate Prevention</h3>
                 <p>The system automatically prevents duplicate names to maintain data integrity:</p>
                 
