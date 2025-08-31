@@ -68,6 +68,10 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         shift_start_dt = pd.to_datetime(f"{day} {shift_start}")
         shift_end_dt = pd.to_datetime(f"{day} {shift_end}")
 
+        # If shift_end is not after shift_start, it crosses midnight -> roll end to next day
+        if shift_end_dt <= shift_start_dt:
+            shift_end_dt = shift_end_dt + timedelta(days=1)
+
         # Calculate expected shift duration and cap datetime (shift end + 8 hours)
         expected_duration = shift_end_dt - shift_start_dt
         cap_dt = shift_end_dt + timedelta(hours=8)
@@ -78,6 +82,15 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
             time_spent_str = str(time_spent_td).split(".")[0]
             return time_spent_str, True, cap_dt
 
+        # If end_time is earlier than or equal to start_time, assume it's on the next day
+        if end_time <= start_time:
+            try:
+                end_time = end_time + timedelta(days=1)
+                time_diff = end_time - start_time
+            except Exception:
+                # if adjustment fails, leave as-is
+                pass
+
         # If the recorded checkout is at or after the cap time, treat as shift_capped and use cap_dt as the effective end
         if end_time >= cap_dt:
             time_spent_td = cap_dt - start_time
@@ -85,15 +98,30 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
             return time_spent_str, True, cap_dt
 
         # Otherwise, the employee checked out before the cap — compute actual worked time (may include overtime)
-        time_spent_str = str(time_diff).split(".")[0]
+        time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
+        # If duration spans multiple days, keep the day component in the string (str(timedelta) already does)
+        time_spent_str = str(time_spent_td).split(".")[0]
         return time_spent_str, False, end_time
     else:
         # No shift assigned - apply 8-hour cap
         eight_hours = timedelta(hours=8)
-        if time_diff > eight_hours:
+        # If there's no end_time, cap at start_time + 8h and flag shift_capped
+        if pd.isna(end_time):
+            cap_dt = start_time + eight_hours
             time_spent_str = str(eight_hours).split(".")[0]
-            # Keep actual end_time, only cap the time_spent for payroll purposes
-            return time_spent_str, True, end_time
+            return time_spent_str, True, cap_dt
+
+        # If end_time appears to be earlier than start_time (overnight), roll forward one day
+        if end_time <= start_time:
+            try:
+                end_time = end_time + timedelta(days=1)
+                time_diff = end_time - start_time
+            except Exception:
+                pass
+
+        if time_diff and time_diff > eight_hours:
+            time_spent_str = str(eight_hours).split(".")[0]
+            return time_spent_str, True, start_time + eight_hours
 
         time_spent_str = str(time_diff).split(".")[0]
         return time_spent_str, False, end_time
@@ -265,6 +293,34 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
         )
         .reset_index()
     )
+
+    # Attempt to link cross-day checkouts: if an entry's end_time is missing or not after start_time,
+    # look for the next timestamp for the same employee (across days) and use that as the end_time.
+    if not worked_summary.empty:
+        for idx, row in worked_summary.iterrows():
+            try:
+                st = row["start_time"]
+                et = row["end_time"]
+                emp = row["employee_id"]
+                # If end_time is NaT or not after start_time, try to find next timestamp for this employee
+                if pd.isna(st):
+                    continue
+                if pd.isna(et) or et <= st:
+                    candidates = df_processed[(df_processed["employee_id"] == emp) & (df_processed["timestamp"] > st)]
+                    if not candidates.empty:
+                        next_ts = candidates["timestamp"].min()
+                        # set end_time and end_device_sn to the next observed event
+                        worked_summary.at[idx, "end_time"] = next_ts
+                        # find device/sn for that timestamp
+                        try:
+                            sn_row = candidates[candidates["timestamp"] == next_ts].iloc[0]
+                            worked_summary.at[idx, "end_device_sn"] = sn_row.get("sn", "")
+                        except Exception:
+                            # leave end_device_sn as-is if lookup fails
+                            pass
+            except Exception:
+                # best-effort: continue on errors
+                continue
 
     if worked_summary.empty:
         return _get_absent_days_fallback(start_date, end_date)

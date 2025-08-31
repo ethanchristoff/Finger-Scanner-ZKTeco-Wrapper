@@ -406,6 +406,12 @@
                             <div class="flash-message flash-{{ category }}">{{ message }}</div>
                         {% endfor %}
                     </div>
+                    {% if employees|length > 50 %}
+                    <div style="width:100%; text-align:center; margin-top:12px;">
+                        <button id="unified-view-more-btn" class="btn">View more</button>
+                        <div id="unified-view-more-info" style="color:#666; font-size:0.9rem; margin-top:6px;"></div>
+                    </div>
+                    {% endif %}
                 {% endif %}
             {% endwith %}
             
@@ -878,6 +884,32 @@
                 closeEditModal();
             }
         });
+
+        // Client-side 'View more' for unified_management item-cards
+        (function() {
+            const PAGE_SIZE = 50;
+            const cards = Array.from(document.querySelectorAll('.items-grid .item-card'));
+            const btn = document.getElementById('unified-view-more-btn');
+            const info = document.getElementById('unified-view-more-info');
+            if (!cards.length || !btn) return;
+            if (cards.length <= PAGE_SIZE) {
+                if (info) info.textContent = `${cards.length} entries`;
+                btn.style.display = 'none';
+                return;
+            }
+
+            cards.forEach((c, i) => { if (i >= PAGE_SIZE) c.style.display = 'none'; });
+            let shown = PAGE_SIZE;
+            if (info) info.textContent = `Showing ${shown} of ${cards.length}`;
+
+            btn.addEventListener('click', function() {
+                const next = Math.min(shown + PAGE_SIZE, cards.length);
+                for (let i = shown; i < next; i++) cards[i].style.display = '';
+                shown = next;
+                if (info) info.textContent = `Showing ${shown} of ${cards.length}`;
+                if (shown >= cards.length) btn.style.display = 'none';
+            });
+        })();
     </script>
 </body>
 </html>

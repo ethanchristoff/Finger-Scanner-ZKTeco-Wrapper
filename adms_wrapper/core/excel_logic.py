@@ -399,7 +399,11 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
 
         try:
             s_time = _to_time(row.get("start_time"))
-            sh_start = _to_time(shift_name and shift_df[shift_df["user_id"] == str(row["employee_id"])].iloc[0]["shift_start"] if not shift_df.empty and not shift_df[shift_df["user_id"] == str(row["employee_id"])].empty else shift_name and None)
+            sh_start = _to_time(
+                shift_name and shift_df[shift_df["user_id"] == str(row["employee_id"])].iloc[0]["shift_start"]
+                if not shift_df.empty and not shift_df[shift_df["user_id"] == str(row["employee_id"])].empty
+                else shift_name and None
+            )
         except Exception:
             s_time = None
             sh_start = None

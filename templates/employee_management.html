@@ -517,6 +517,10 @@
                         </tbody>
                     </table>
                 </div>
+                <div style="text-align:center; margin-top:12px;">
+                    <button id="employee-view-more-btn" class="btn" style="display:none;">View more</button>
+                    <div id="employee-view-more-info" style="color:#666; font-size:0.9rem; margin-top:6px;"></div>
+                </div>
             </div>
             
             <div style="margin-top: 30px; padding: 20px; background: #e8f4f8; border-radius: 10px; border-left: 4px solid #3498db;">
@@ -643,6 +647,36 @@
                 closeEditModal();
             }
         });
+
+        // Client-side 'View more' pagination for employee table
+        (function() {
+            const PAGE_SIZE = 50;
+            const tbody = document.querySelector('table tbody');
+            if (!tbody) return;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const btn = document.getElementById('employee-view-more-btn');
+            const info = document.getElementById('employee-view-more-info');
+            if (rows.length <= PAGE_SIZE) {
+                if (info) info.textContent = `${rows.length} entries`;
+                return;
+            }
+
+            // Hide rows beyond the first page
+            rows.forEach((r, i) => { if (i >= PAGE_SIZE) r.style.display = 'none'; });
+            let shown = PAGE_SIZE;
+            btn.style.display = 'inline-block';
+            if (info) info.textContent = `Showing ${shown} of ${rows.length}`;
+
+            btn.addEventListener('click', function() {
+                const next = Math.min(shown + PAGE_SIZE, rows.length);
+                for (let i = shown; i < next; i++) rows[i].style.display = '';
+                shown = next;
+                if (info) info.textContent = `Showing ${shown} of ${rows.length}`;
+                if (shown >= rows.length) {
+                    btn.style.display = 'none';
+                }
+            });
+        })();
     </script>
 </body>
 </html>
