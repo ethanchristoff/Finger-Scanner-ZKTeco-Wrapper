@@ -457,7 +457,9 @@
                             <td>{{ row.day }}</td>
                             <td>
                                 {{ row.start_time[:5] if row.start_time else '-' }}
-                                {% if row.late_in %}
+                                {% if row.early_in %}
+                                    <span class="time-early" title="Early check-in"> &nbsp;{{ row.early_in_time[:5] if row.early_in_time else row.start_time[:5] if row.start_time else '' }} ⏰</span>
+                                {% elif row.late_in %}
                                     <span class="time-flagged" title="Late check-in"> &nbsp;{{ row.late_in_time[:5] if row.late_in_time else row.start_time[:5] if row.start_time else '' }} ⚠️</span>
                                 {% endif %}
                             </td>
@@ -494,6 +496,8 @@
                                     <span class="status-badge status-overtime" title="Overtime checkout">OVERTIME</span>
                                 {% elif row.shift_flag == "late in" %}
                                     <span class="status-badge status-late-in" title="Late check-in - after grace period">LATE IN</span>
+                                {% elif row.early_in %}
+                                    <span class="status-badge status-early-in" title="Early check-in - before shift">EARLY IN</span>
                                 {% elif row.shift_flag == "early out" %}
                                     <span class="status-badge status-early-out">EARLY OUT</span>
                                 {% elif row.no_checkout %}

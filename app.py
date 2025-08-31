@@ -859,6 +859,8 @@ def download_filtered_attendance() -> Any:
             return "no checkout"
         if f in ("late in", "latein"):
             return "late in"
+        if f in ("early in", "earlyin"):
+            return "early in"
         if f in ("early out", "earlyout"):
             return "early out"
         if f in ("overtime", "over time"):

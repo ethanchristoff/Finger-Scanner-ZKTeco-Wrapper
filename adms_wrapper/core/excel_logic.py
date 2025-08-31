@@ -158,18 +158,30 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                 dt = dt + timedelta(days=1)
             return dt
 
-        # Determine late in using datetimes (robust across midnight)
+        # Determine early in / late in using datetimes (robust across midnight)
         if s_time and sh_start:
             try:
                 s_dt = _to_dt_with_shift(s_time)
-                start_threshold = sh_start_dt + timedelta(minutes=5)
-                if s_dt and s_dt > start_threshold:
+                early_threshold = sh_start_dt - timedelta(minutes=30)
+                late_threshold = sh_start_dt + timedelta(minutes=5)
+                if s_dt and s_dt < early_threshold:
+                    # Checked in 30+ minutes before shift start -> early in
+                    flag = "early in"
+                elif s_dt and s_dt > late_threshold:
+                    # Checked in more than 5 minutes after shift start -> late in
                     flag = "late in"
             except Exception:
                 # best-effort fallback to time-only compare
-                late_in_threshold = (datetime.combine(today, sh_start) + timedelta(minutes=5)).time()
-                if s_time > late_in_threshold:
-                    flag = "late in"
+                try:
+                    early_in_threshold = (datetime.combine(today, sh_start) - timedelta(minutes=30)).time()
+                    late_in_threshold = (datetime.combine(today, sh_start) + timedelta(minutes=5)).time()
+                    if s_time < early_in_threshold:
+                        flag = "early in"
+                    elif s_time > late_in_threshold:
+                        flag = "late in"
+                except Exception:
+                    # leave flag as-is
+                    pass
 
         # Determine out-related flags using datetimes for correctness across midnight
         if e_time and sh_end:
@@ -378,9 +390,11 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
 
     summary_df["shift_name"] = ""
     summary_df["shift_flag"] = ""
-    # New columns to track late check-ins separately from shift_flag
+    # New columns to track early/late check-ins separately from shift_flag
     summary_df["late_in"] = False
     summary_df["late_in_time"] = ""
+    summary_df["early_in"] = False
+    summary_df["early_in_time"] = ""
 
     for idx, row in summary_df.iterrows():
         no_checkout = row.get("no_checkout", False)
@@ -418,23 +432,33 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
                 pass
 
         late_in_flag = False
+        early_in_flag = False
         if s_time and sh_start:
             try:
                 today = datetime.today().date()
                 s_dt = datetime.combine(today, s_time)
-                threshold_dt = datetime.combine(today, sh_start) + timedelta(minutes=5)
-                if s_dt > threshold_dt:
+                early_threshold_dt = datetime.combine(today, sh_start) - timedelta(minutes=30)
+                late_threshold_dt = datetime.combine(today, sh_start) + timedelta(minutes=5)
+                if s_dt < early_threshold_dt:
+                    early_in_flag = True
+                elif s_dt > late_threshold_dt:
                     late_in_flag = True
             except Exception:
                 late_in_flag = False
+                early_in_flag = False
 
         summary_df.loc[idx, "late_in"] = late_in_flag
+        summary_df.loc[idx, "early_in"] = early_in_flag
         if late_in_flag:
-            # store a formatted time string for display
             try:
                 summary_df.loc[idx, "late_in_time"] = s_time.strftime("%H:%M:%S") if s_time else str(row.get("start_time") or "")
             except Exception:
                 summary_df.loc[idx, "late_in_time"] = str(row.get("start_time") or "")
+        if early_in_flag:
+            try:
+                summary_df.loc[idx, "early_in_time"] = s_time.strftime("%H:%M:%S") if s_time else str(row.get("start_time") or "")
+            except Exception:
+                summary_df.loc[idx, "early_in_time"] = str(row.get("start_time") or "")
 
     return summary_df
 
@@ -628,6 +652,7 @@ def apply_flag_highlighting(ws: Any) -> None:
     overtime_fill = PatternFill(start_color="FFDFA6", end_color="FFDFA6", fill_type="solid")  # light orange
     late_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # light red/pink
     shift_capped_fill = PatternFill(start_color="E6E0FF", end_color="E6E0FF", fill_type="solid")  # light purple
+    early_in_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")  # light blue for early in
     normal_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # light green
 
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
@@ -639,13 +664,16 @@ def apply_flag_highlighting(ws: Any) -> None:
             # Determine presence of keywords (overlapping flags allowed)
             has_overtime = "overtime" in val or "over time" in val
             has_late_in = "late in" in val or "latein" in val
+            has_early_in = "early in" in val or "earlyin" in val
             has_no_checkout = "no checkout" in val or "shift cap" in val or "shiftcap" in val
 
-            # Choose a fill with precedence: overtime > no_checkout > late_in > normal
+            # Choose a fill with precedence: overtime > no_checkout > early_in > late_in > normal
             if has_overtime:
                 fill = overtime_fill
             elif has_no_checkout:
                 fill = shift_capped_fill
+            elif has_early_in:
+                fill = early_in_fill
             elif has_late_in:
                 fill = late_fill
             else:
@@ -817,11 +845,16 @@ def write_excel(
 
             # Combine shift_flag with late_in if the latter exists so overlapping flags are visible
             try:
-                # ensure late_in series exists
+                # ensure late_in and early_in series exist
                 if "late_in" in merged.columns:
                     late_series = merged["late_in"].fillna(False).astype(bool)
                 else:
                     late_series = pd.Series([False] * len(merged), index=merged.index)
+
+                if "early_in" in merged.columns:
+                    early_series = merged["early_in"].fillna(False).astype(bool)
+                else:
+                    early_series = pd.Series([False] * len(merged), index=merged.index)
 
                 # get current shift flag column (may be named differently)
                 if "Shift Flag" in export_df.columns:
@@ -835,8 +868,11 @@ def write_excel(
                     bf_str = str(bf).strip()
                     if bf_str:
                         parts.extend([p.strip() for p in bf_str.split(";") if p.strip()])
+                    # only append 'early in' or 'late in' if not already present
+                    if early_series.iloc[idx]:
+                        if not any(p.lower() == "early in" for p in parts):
+                            parts.insert(0, "early in")
                     if late_series.iloc[idx]:
-                        # only append 'late in' if not already present
                         if not any(p.lower() == "late in" for p in parts):
                             parts.append("late in")
 
