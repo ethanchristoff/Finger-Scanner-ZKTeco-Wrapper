@@ -230,6 +230,10 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                <div style="text-align:center; margin-top:12px;">
+                    <button id="user-shift-view-more-btn" class="btn" style="display:none;">View more</button>
+                    <div id="user-shift-view-more-info" style="color:#a0aec0; font-size:0.9rem; margin-top:6px;"></div>
+                </div>
             </div>
             {% else %}
             <div style="text-align: center; padding: 40px; color: #a0aec0;">
@@ -243,5 +247,21 @@
             </a>
         </div>
     </div>
+    <script>
+        (function(){
+            const PAGE_SIZE = 50;
+            document.addEventListener('DOMContentLoaded', function(){
+                const table = document.querySelector('table');
+                if (!table) return;
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                const btn = document.getElementById('user-shift-view-more-btn');
+                const info = document.getElementById('user-shift-view-more-info');
+                if (rows.length <= PAGE_SIZE) { if (info) info.textContent = `${rows.length} entries`; if (btn) btn.style.display='none'; return; }
+                rows.forEach((r,i)=>{ if (i >= PAGE_SIZE) r.style.display='none'; });
+                let shown = PAGE_SIZE; if (btn) btn.style.display='inline-block'; if (info) info.textContent = `Showing ${shown} of ${rows.length}`;
+                btn.addEventListener('click', function(){ const next = Math.min(shown+PAGE_SIZE, rows.length); for (let i=shown;i<next;i++) rows[i].style.display=''; shown = next; if (info) info.textContent = `Showing ${shown} of ${rows.length}`; if (shown>=rows.length) btn.style.display='none'; });
+            });
+        })();
+    </script>
 </body>
 </html>
