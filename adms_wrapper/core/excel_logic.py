@@ -181,17 +181,14 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                     flag = "early out"
                 else:
                     normal_threshold_dt = sh_end_dt + timedelta(minutes=15)
-                    ot_upper_dt = sh_end_dt + timedelta(hours=8)
+                    # Any checkout after the normal grace window is considered a late checkout
                     if e_dt <= normal_threshold_dt:
                         # Within normal grace window
                         if flag != "late in":
                             flag = "normal"
                     else:
-                        # After normal grace window
-                        if e_dt <= ot_upper_dt:
-                            flag = "overtime"
-                        else:
-                            flag = "shift_capped"
+                        # After normal grace window -> late checkout
+                        flag = "late checkout"
             except Exception:
                 # Fallback to original time-only logic: consider early out if checkout is before shift start or before shift end
                 try:
@@ -206,7 +203,7 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                                 if flag != "late in":
                                     flag = "normal"
                             else:
-                                flag = "overtime"
+                                flag = "late checkout"
                         except Exception:
                             flag = "overtime"
                 except Exception:
@@ -230,7 +227,7 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                             if flag != "late in":
                                 flag = "normal"
                         else:
-                            flag = "overtime"
+                            flag = "late checkout"
                     except Exception:
                         flag = "overtime"
     except Exception:
@@ -312,7 +309,7 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
                 shift_end_dt = datetime.combine(date_part, sh_end)
                 cap_dt = shift_end_dt + timedelta(hours=8)
                 if datetime.now() >= cap_dt:
-                    return chosen_shift_name, "shift_capped"
+                    return chosen_shift_name, "no checkout"
         except Exception:
             pass
 
@@ -386,11 +383,11 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
     summary_df["late_in_time"] = ""
 
     for idx, row in summary_df.iterrows():
-        shift_capped = row.get("shift_capped", False)
+        no_checkout = row.get("no_checkout", False)
 
-        if shift_capped:
+        if no_checkout:
             shift_name, _ = get_shift_info_with_capped(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_df)
-            flag = "shift_capped"
+            flag = "no checkout"
         else:
             shift_name, flag = get_shift_info_with_capped(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_df)
 
@@ -455,7 +452,7 @@ def clean_attendance_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
         summary_df["end_time"] = summary_df["end_time"].apply(lambda x: x.strftime("%H:%M:%S") if pd.notna(x) and hasattr(x, "strftime") else "")
 
     # Remove unwanted columns (keeping start_device_sn_branch and end_device_sn_branch)
-    columns_to_remove = ["start_device_sn", "end_device_sn", "shift_capped", "designation", "employee_branch"]
+    columns_to_remove = ["start_device_sn", "end_device_sn", "no_checkout", "designation", "employee_branch"]
 
     for col in columns_to_remove:
         if col in summary_df.columns:
@@ -543,7 +540,7 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
     """Find column indices for highlighting."""
     day_col = None
     work_status_col = None
-    shift_capped_col = None
+    no_checkout_col = None
 
     for idx, cell in enumerate(ws[1], start=1):
         if cell.value is None:
@@ -554,10 +551,10 @@ def find_column_indices(ws: Any) -> tuple[int | None, int | None, int | None]:
             day_col = idx
         if header in ("work_status", "work status", "workstatus"):
             work_status_col = idx
-        if header in ("shift_capped", "shift capped", "shiftcap"):
-            shift_capped_col = idx
+        if header in ("no_checkout", "no checkout", "shift capped", "shiftcap"):
+            no_checkout_col = idx
 
-    return day_col, work_status_col, shift_capped_col
+    return day_col, work_status_col, no_checkout_col
 
 
 def apply_subtotal_highlighting(row: list, day_col: int | None, blue_fill: PatternFill) -> None:
@@ -575,15 +572,15 @@ def apply_subtotal_highlighting(row: list, day_col: int | None, blue_fill: Patte
         return
 
 
-def apply_status_highlighting(row: list, work_status_col: int | None, shift_capped_col: int | None, green_fill: PatternFill, red_fill: PatternFill, yellow_fill: PatternFill) -> None:
+def apply_status_highlighting(row: list, work_status_col: int | None, no_checkout_col: int | None, green_fill: PatternFill, red_fill: PatternFill, yellow_fill: PatternFill) -> None:
     """Apply highlighting based on work status."""
     if not work_status_col:
         return
 
     work_status = row[work_status_col - 1].value
-    shift_capped = row[shift_capped_col - 1].value if shift_capped_col else False
+    no_checkout = row[no_checkout_col - 1].value if no_checkout_col else False
 
-    if shift_capped:
+    if no_checkout:
         for cell in row:
             cell.fill = yellow_fill
     elif work_status == "worked":
@@ -596,7 +593,7 @@ def apply_status_highlighting(row: list, work_status_col: int | None, shift_capp
 
 def apply_row_highlighting(ws: Any) -> None:
     """Apply highlighting to rows based on work status."""
-    day_col, work_status_col, shift_capped_col = find_column_indices(ws)
+    day_col, work_status_col, no_checkout_col = find_column_indices(ws)
 
     blue_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
@@ -605,7 +602,7 @@ def apply_row_highlighting(ws: Any) -> None:
 
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
         apply_subtotal_highlighting(row, day_col, blue_fill)
-        apply_status_highlighting(row, work_status_col, shift_capped_col, green_fill, red_fill, yellow_fill)
+        apply_status_highlighting(row, work_status_col, no_checkout_col, green_fill, red_fill, yellow_fill)
 
 
 def apply_flag_highlighting(ws: Any) -> None:
@@ -642,12 +639,12 @@ def apply_flag_highlighting(ws: Any) -> None:
             # Determine presence of keywords (overlapping flags allowed)
             has_overtime = "overtime" in val or "over time" in val
             has_late_in = "late in" in val or "latein" in val
-            has_shift_cap = "shift cap" in val or "shift_capped" in val or "shiftcap" in val
+            has_no_checkout = "no checkout" in val or "shift cap" in val or "shiftcap" in val
 
-            # Choose a fill with precedence: overtime > shift_capped > late_in > normal
+            # Choose a fill with precedence: overtime > no_checkout > late_in > normal
             if has_overtime:
                 fill = overtime_fill
-            elif has_shift_cap:
+            elif has_no_checkout:
                 fill = shift_capped_fill
             elif has_late_in:
                 fill = late_fill
@@ -694,12 +691,20 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
         # Get shift information
         shift_name = first_row.get("shift_name", "")
 
-        # Count different shift flags
+    # Count different shift flags
         late_in_count = len(group[group["shift_flag"] == "late in"])
         early_out_count = len(group[group["shift_flag"] == "early out"])
         late_checkout_count = len(group[group["shift_flag"] == "late checkout"])
         on_time_count = len(group[group["shift_flag"] == "on time"])
-        shift_capped_count = len(group[group["shift_flag"] == "shift_capped"])
+        # Safely count rows marked as no_checkout. If the column is missing, treat as zero.
+        if "no_checkout" in group.columns:
+            try:
+                no_checkout_count = int(group["no_checkout"].fillna(False).astype(bool).sum())
+            except Exception:
+                # If conversion fails for any unexpected reason, fallback to len of truthy values
+                no_checkout_count = int(sum(1 for v in group["no_checkout"] if bool(v)))
+        else:
+            no_checkout_count = 0
 
         # Calculate attendance percentage
         attendance_percentage = (worked_days / total_days * 100) if total_days > 0 else 0
@@ -719,7 +724,7 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
             "late_in_days": late_in_count,
             "early_out_days": early_out_count,
             "late_checkout_days": late_checkout_count,
-            "shift_capped_days": shift_capped_count,
+            "no_checkout_days": no_checkout_count,
         }
         summary_rows.append(summary_row)
 
@@ -855,7 +860,7 @@ def write_excel(
 
     if "AttendanceSummary" in wb.sheetnames:
         ws = wb["AttendanceSummary"]
-        # Apply our excel-specific flag-based highlighting (overtime, late in, shift_capped)
+    # Apply our excel-specific flag-based highlighting (overtime, late in, no checkout)
         try:
             apply_flag_highlighting(ws)
         except Exception:

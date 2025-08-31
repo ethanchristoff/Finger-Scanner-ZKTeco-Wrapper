@@ -154,17 +154,17 @@ def process_attendance_summary(attendences: list[dict[str, Any]]) -> pd.DataFram
     df_att = pd.DataFrame(attendences)
     required_cols = {"employee_id", "timestamp", "sn"}
     if not required_cols.issubset(df_att.columns):
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout"])
 
     if df_att.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout"])
 
     shift_dict = get_shift_mappings()
     df_att["timestamp"] = pd.to_datetime(df_att["timestamp"])
 
     processed_entries = process_attendance_entries(df_att, shift_dict)
     if not processed_entries:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout"])
 
     df_processed = pd.DataFrame(processed_entries)
 
@@ -187,12 +187,12 @@ def process_attendance_summary(attendences: list[dict[str, Any]]) -> pd.DataFram
     )
 
     if worked_summary.empty:
-        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+        return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout"])
 
     time_results = worked_summary.apply(lambda row: calculate_time_spent_and_flag(row, shift_dict), axis=1, result_type="expand")
 
     worked_summary["time_spent"] = time_results[0]
-    worked_summary["shift_capped"] = time_results[1]
+    worked_summary["no_checkout"] = time_results[1]
     worked_summary["end_time"] = time_results[2]
     worked_summary = worked_summary.drop(columns=["num_entries"])
 

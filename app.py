@@ -856,13 +856,15 @@ def download_filtered_attendance() -> Any:
         f = str(raw_flag).strip().lower()
         # Normalize some names
         if f in ("shift_capped", "shift cap", "shiftcap"):
-            return "shift cap"
+            return "no checkout"
         if f in ("late in", "latein"):
             return "late in"
         if f in ("early out", "earlyout"):
             return "early out"
         if f in ("overtime", "over time"):
             return "overtime"
+        if f in ("late checkout", "late-checkout", "latecheckout"):
+            return "late checkout"
         if f in ("normal", "on time", "ontime"):
             return "normal"
         if f == "absent":

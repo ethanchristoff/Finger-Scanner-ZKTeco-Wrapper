@@ -37,7 +37,11 @@ def is_weekend(date: pd.Timestamp) -> bool:
 
 
 def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str, Any]]) -> tuple[str, bool, pd.Timestamp]:
-    """Calculate time spent and determine if shift is capped."""
+    """Calculate time spent and determine if there's a no-checkout.
+
+    Returns: (time_spent_str, no_checkout_bool, end_time_to_use)
+    - no_checkout_bool: True when employee did not checkout between shift_end+15min and next shift start.
+    """
     start_time = row["start_time"]
     end_time = row["end_time"]
     employee_id = row["employee_id"]
@@ -72,15 +76,20 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         if shift_end_dt <= shift_start_dt:
             shift_end_dt = shift_end_dt + timedelta(days=1)
 
-        # Calculate expected shift duration and cap datetime (shift end + 8 hours)
+        # Calculate expected shift duration and the next shift start (assume next day's shift_start)
         expected_duration = shift_end_dt - shift_start_dt
-        cap_dt = shift_end_dt + timedelta(hours=8)
+        next_shift_start_dt = shift_start_dt + timedelta(days=1)
+        # grace deadline after shift end (15 minutes)
+        grace_dt = shift_end_dt + timedelta(minutes=15)
 
-        # If there's no recorded checkout (end_time is NaT), treat as shift_capped and set end_time to cap_dt
+        # If there's no recorded checkout (end_time is NaT), treat as no_checkout
+        # and set end_time to the grace deadline for time counting (employee didn't checkout)
         if pd.isna(end_time):
-            time_spent_td = cap_dt - start_time
+            # If start_time is after grace_dt for some odd reason, count from start_time to start_time (0)
+            end_use = grace_dt if grace_dt > start_time else start_time
+            time_spent_td = end_use - start_time
             time_spent_str = str(time_spent_td).split(".")[0]
-            return time_spent_str, True, cap_dt
+            return time_spent_str, True, end_use
 
         # If end_time is earlier than or equal to start_time, assume it's on the next day
         if end_time <= start_time:
@@ -90,23 +99,24 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
             except Exception:
                 # if adjustment fails, leave as-is
                 pass
-
-        if end_time >= cap_dt:
-            time_spent_td = end_time - start_time
+        # If employee checked out after shift_end_dt
+        if end_time > shift_end_dt:
+            # Count every minute up to actual checkout as part of shift (late checkout)
+            time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
             time_spent_str = str(time_spent_td).split(".")[0]
             return time_spent_str, False, end_time
 
-        # Otherwise, the employee checked out before the cap — compute actual worked time (may include overtime)
+        # Otherwise, the employee checked out before or at shift end — normal/early out
         time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
-        # If duration spans multiple days, keep the day component in the string (str(timedelta) already does)
         time_spent_str = str(time_spent_td).split(".")[0]
         return time_spent_str, False, end_time
     else:
         # No shift assigned - apply 8-hour cap
         eight_hours = timedelta(hours=8)
-        # If there's no end_time, cap at start_time + 8h and flag shift_capped
+        # If there's no end_time, treat as no_checkout and count up to start_time + 8h window
         if pd.isna(end_time):
             cap_dt = start_time + eight_hours
+            # Use cap_dt as conservative counting endpoint when no shift is known
             time_spent_str = str(eight_hours).split(".")[0]
             return time_spent_str, True, cap_dt
 
@@ -193,7 +203,7 @@ def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | No
                         "end_device_sn": "",
                         "time_spent": "0:00:00",
                         "work_status": "absent",
-                        "shift_capped": False,
+                        "no_checkout": False,
                     }
                 )
 
@@ -234,7 +244,7 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
                     "end_device_sn": "",
                     "time_spent": "0:00:00",
                     "work_status": "absent",
-                    "shift_capped": False,
+                        "no_checkout": False,
                 }
             )
 
@@ -247,7 +257,7 @@ def _get_absent_days_fallback(start_date: str | None, end_date: str | None) -> p
         absent_records = generate_absent_days_for_date_range(start_date, end_date)
         if absent_records:
             return pd.DataFrame(absent_records)
-    return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "shift_capped"])
+    return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout"])
 
 
 def process_attendance_summary(attendences: list[dict[str, Any]], start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
@@ -276,51 +286,94 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
 
     df_processed = pd.DataFrame(processed_entries)
 
-    worked_summary = (
-        df_processed.groupby(["employee_id", "day"])
-        .apply(
-            lambda g: pd.Series(
-                {
-                    "start_time": g["timestamp"].min(),
-                    "end_time": g["timestamp"].max(),
-                    "start_device_sn": get_device_for_time(g, "timestamp", "sn", "min"),
-                    "end_device_sn": get_device_for_time(g, "timestamp", "sn", "max"),
-                    "work_status": "worked",
-                    "num_entries": len(g),
-                }
-            ),
-            include_groups=False,
-        )
-        .reset_index()
-    )
+    # Build worked summary by pairing timestamps sequentially per employee.
+    # This ensures that if a checkout falls beyond the cap window it will NOT be
+    # linked back to the previous start; instead that later timestamp will remain
+    # available to be treated as a start for the next shift.
+    worked_rows: list[dict[str, Any]] = []
 
-    # Attempt to link cross-day checkouts: if an entry's end_time is missing or not after start_time,
-    # look for the next timestamp for the same employee (across days) and use that as the end_time.
-    if not worked_summary.empty:
-        for idx, row in worked_summary.iterrows():
-            try:
-                st = row["start_time"]
-                et = row["end_time"]
-                emp = row["employee_id"]
-                # If end_time is NaT or not after start_time, try to find next timestamp for this employee
-                if pd.isna(st):
+    # Prepare per-employee sorted lists of timestamps
+    for emp, emp_df in df_processed.groupby("employee_id"):
+        emp_df_sorted = emp_df.sort_values("timestamp").reset_index(drop=True)
+        n = len(emp_df_sorted)
+        i = 0
+        while i < n:
+            st_row = emp_df_sorted.loc[i]
+            st = st_row["timestamp"]
+            # Determine pairing boundary for this start.
+            # For employees with an assigned shift, we consider any checkout before the next shift start
+            # as a checkout for this shift (including late checkouts). If no checkout exists before
+            # the next shift start, it will be treated as a no_checkout.
+            if emp in shift_dict:
+                shift_info = shift_dict[emp]
+                shift_start_time = pd.to_datetime(shift_info["shift_start"]).time()
+                shift_end_time = pd.to_datetime(shift_info["shift_end"]).time()
+                shift_start_dt = pd.to_datetime(f"{st.date()} {shift_start_time}")
+                shift_end_dt = pd.to_datetime(f"{st.date()} {shift_end_time}")
+                # If shift_end is not after shift_start, it crosses midnight -> roll end to next day
+                if shift_end_dt <= shift_start_dt:
+                    shift_end_dt = shift_end_dt + timedelta(days=1)
+                # Next shift start is shift_start on the following day
+                next_shift_start_dt = shift_start_dt + timedelta(days=1)
+                boundary_dt = next_shift_start_dt
+            else:
+                # For employees without a shift mapping, allow any subsequent timestamp to be considered a checkout
+                boundary_dt = None
+
+            # Find latest candidate after st and before boundary_dt (if set) or any next timestamp otherwise
+            j = i + 1
+            candidate_index = None
+            while j < n:
+                ts_j = emp_df_sorted.loc[j, "timestamp"]
+                if ts_j <= st:
+                    j += 1
                     continue
-                if pd.isna(et) or et <= st:
-                    candidates = df_processed[(df_processed["employee_id"] == emp) & (df_processed["timestamp"] > st)]
-                    if not candidates.empty:
-                        next_ts = candidates["timestamp"].min()
-                        # set end_time and end_device_sn to the next observed event
-                        worked_summary.at[idx, "end_time"] = next_ts
-                        # find device/sn for that timestamp
-                        try:
-                            sn_row = candidates[candidates["timestamp"] == next_ts].iloc[0]
-                            worked_summary.at[idx, "end_device_sn"] = sn_row.get("sn", "")
-                        except Exception:
-                            # leave end_device_sn as-is if lookup fails
-                            pass
-            except Exception:
-                # best-effort: continue on errors
-                continue
+                if boundary_dt is not None and ts_j >= boundary_dt:
+                    # This timestamp belongs to the next shift window; stop searching
+                    break
+                # keep the latest found before the boundary
+                candidate_index = j
+                j += 1
+
+            if candidate_index is not None:
+                end_row = emp_df_sorted.loc[candidate_index]
+                end_ts = end_row["timestamp"]
+                worked_rows.append(
+                    {
+                        "employee_id": emp,
+                        "day": st.date(),
+                        "start_time": st,
+                        "end_time": end_ts,
+                        "start_device_sn": st_row.get("sn", ""),
+                        "end_device_sn": end_row.get("sn", ""),
+                        "work_status": "worked",
+                        "num_entries": candidate_index - i + 1,
+                    }
+                )
+                # consume up to candidate_index
+                i = candidate_index + 1
+            else:
+                # No checkout within cap window -> leave end_time as NaT so cap logic will apply later
+                worked_rows.append(
+                    {
+                        "employee_id": emp,
+                        "day": st.date(),
+                        "start_time": st,
+                        "end_time": pd.NaT,
+                        "start_device_sn": st_row.get("sn", ""),
+                        "end_device_sn": "",
+                        "work_status": "worked",
+                        "num_entries": 1,
+                    }
+                )
+                # move to next timestamp which will be treated as next shift's start
+                i += 1
+
+    # Create DataFrame from worked_rows
+    worked_summary = pd.DataFrame(worked_rows) if worked_rows else pd.DataFrame()
+
+    if worked_summary.empty:
+        return _get_absent_days_fallback(start_date, end_date)
 
     if worked_summary.empty:
         return _get_absent_days_fallback(start_date, end_date)
@@ -328,9 +381,11 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
     time_results = worked_summary.apply(lambda row: calculate_time_spent_and_flag(row, shift_dict), axis=1, result_type="expand")
 
     worked_summary["time_spent"] = time_results[0]
-    worked_summary["shift_capped"] = time_results[1]
+    # second column now represents 'no_checkout' boolean
+    worked_summary["no_checkout"] = time_results[1]
     worked_summary["end_time"] = time_results[2]
-    worked_summary = worked_summary.drop(columns=["num_entries"])
+    if "num_entries" in worked_summary.columns:
+        worked_summary = worked_summary.drop(columns=["num_entries"])
 
     complete_records = generate_complete_records(worked_summary, start_date, end_date)
     summary = pd.DataFrame(complete_records)

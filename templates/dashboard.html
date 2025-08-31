@@ -413,8 +413,8 @@
                 <div class="legend-title">📋 Status Legend</div>
                 <div class="legend-items">
                     <div class="legend-item">
-                        <span class="legend-badge badge-capped">SHIFT CAPPED</span>
-                        <span>Work hours limited by shift schedule</span>
+                        <span class="legend-badge badge-capped">NO CHECKOUT</span>
+                        <span>Employee did not checkout (counted until grace deadline)</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-badge badge-overtime">OVERTIME</span>
@@ -449,7 +449,7 @@
                     </thead>
                     <tbody>
                         {% for row in summary %}
-                        <tr {% if row.shift_capped %}class="row-capped"{% endif %}>
+                        <tr {% if row.no_checkout %}class="row-capped"{% endif %}>
                             <td><strong>{{ row.employee_id }}</strong></td>
                             <td><strong>{{ row.employee_name if row.employee_name else '-' }}</strong></td>
                             <td>{{ row.designation if row.designation else '-' }}</td>
@@ -473,8 +473,8 @@
                             <td>
                                 {% if row.shift_flag == "overtime" %}
                                     <span class="time-overtime" title="Actual time worked including overtime">{{ row.time_spent }} 🔄</span>
-                                {% elif row.shift_capped %}
-                                    <span class="time-flagged" title="Hours capped by shift schedule">{{ row.time_spent }} ⚠️</span>
+                                {% elif row.no_checkout %}
+                                    <span class="time-flagged" title="No checkout recorded">{{ row.time_spent }} ⚠️</span>
                                 {% elif row.end_time and row.end_time == '23:59:59' %}
                                     <span class="time-auto" title="Calculated until end of day">{{ row.time_spent }}</span>
                                 {% else %}
@@ -496,8 +496,8 @@
                                     <span class="status-badge status-late-in" title="Late check-in - after grace period">LATE IN</span>
                                 {% elif row.shift_flag == "early out" %}
                                     <span class="status-badge status-early-out">EARLY OUT</span>
-                                {% elif row.shift_capped %}
-                                    <span class="status-badge status-capped">SHIFT CAPPED</span>
+                                {% elif row.no_checkout %}
+                                    <span class="status-badge status-capped">NO CHECKOUT</span>
                                 {% elif row.shift_flag == "normal" %}
                                     <span class="status-badge status-normal">NORMAL</span>
                                 {% else %}
