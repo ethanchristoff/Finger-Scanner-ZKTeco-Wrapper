@@ -1115,27 +1115,20 @@ def settings() -> Any:
         if action == "set_shift_settings":
             # Save shift-related numeric settings
             shift_cap_hours = request.form.get("shift_cap_hours")
-            early_checkin_minutes = request.form.get("early_checkin_minutes")
             late_checkout_grace_minutes = request.form.get("late_checkout_grace_minutes")
             shift_cap_type = request.form.get("shift_cap_type")
-            
+
             errors = False
             try:
                 if shift_cap_hours is not None and str(shift_cap_hours).strip() != "":
                     int(shift_cap_hours)
-                    set_setting("shift_cap_hours", str(shift_cap_hours), "Hours after shift end to consider no-checkout / shift capped")
+                    set_setting("shift_cap_hours", str(shift_cap_hours), "Hours after shift end + grace period to consider no-checkout / shift capped")
             except Exception:
                 flash("shift_cap_hours must be an integer", "error")
                 errors = True
 
-            try:
-                if early_checkin_minutes is not None and str(early_checkin_minutes).strip() != "":
-                    int(early_checkin_minutes)
-                    set_setting("early_checkin_minutes", str(early_checkin_minutes), "Minutes before shift start to treat check-in as early in")
-            except Exception:
-                flash("early_checkin_minutes must be an integer", "error")
-                errors = True
-                
+            # Note: early_checkin_minutes setting has been removed, early check-ins are now considered normal
+
             try:
                 if late_checkout_grace_minutes is not None and str(late_checkout_grace_minutes).strip() != "":
                     int(late_checkout_grace_minutes)
@@ -1143,7 +1136,7 @@ def settings() -> Any:
             except Exception:
                 flash("late_checkout_grace_minutes must be an integer", "error")
                 errors = True
-                
+
             # Set shift cap type - either "normal" or "zero"
             if shift_cap_type in ["normal", "zero"]:
                 set_setting("shift_cap_type", shift_cap_type, "How to handle hours for shift-capped entries")
@@ -1160,7 +1153,6 @@ def settings() -> Any:
         current_default_shift = get_default_shift()
         all_shifts = get_shift_templates()
         current_shift_cap = get_setting("shift_cap_hours") or "8"
-        current_early_checkin = get_setting("early_checkin_minutes") or "30"
         current_late_checkout_grace = get_setting("late_checkout_grace_minutes") or "15"
         current_shift_cap_type = get_setting("shift_cap_type") or "normal"
     except Exception as e:
@@ -1168,7 +1160,6 @@ def settings() -> Any:
         current_default_shift = None
         all_shifts = []
         current_shift_cap = "8"
-        current_early_checkin = "30"
         current_late_checkout_grace = "15"
         current_shift_cap_type = "normal"
 
@@ -1177,7 +1168,6 @@ def settings() -> Any:
         current_default_shift=current_default_shift,
         all_shifts=all_shifts,
         current_shift_cap=current_shift_cap,
-        current_early_checkin=current_early_checkin,
         current_late_checkout_grace=current_late_checkout_grace,
         current_shift_cap_type=current_shift_cap_type,
     )

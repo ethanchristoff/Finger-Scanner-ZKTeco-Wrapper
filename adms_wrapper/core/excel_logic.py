@@ -159,31 +159,21 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                 dt = dt + timedelta(days=1)
             return dt
 
-        # Determine early in / late in using datetimes (robust across midnight)
+        # Determine late in using datetimes (robust across midnight)
+        # Note: We no longer flag early check-ins as special - they are normal
         if s_time and sh_start:
             try:
                 s_dt = _to_dt_with_shift(s_time)
-                # Use configurable early-in window from settings (minutes before shift to consider early)
-                try:
-                    early_minutes = int(get_setting("early_checkin_minutes") or 30)
-                except Exception:
-                    early_minutes = 30
-                early_threshold = sh_start_dt - timedelta(minutes=early_minutes)
+                # Only check for late arrivals (after grace period)
                 late_threshold = sh_start_dt + timedelta(minutes=5)
-                if s_dt and s_dt < early_threshold:
-                    # Checked in 30+ minutes before shift start -> early in
-                    flag = "early in"
-                elif s_dt and s_dt > late_threshold:
+                if s_dt and s_dt > late_threshold:
                     # Checked in more than 5 minutes after shift start -> late in
                     flag = "late in"
             except Exception:
                 # best-effort fallback to time-only compare
                 try:
-                    early_in_threshold = (datetime.combine(today, sh_start) - timedelta(minutes=30)).time()
                     late_in_threshold = (datetime.combine(today, sh_start) + timedelta(minutes=5)).time()
-                    if s_time < early_in_threshold:
-                        flag = "early in"
-                    elif s_time > late_in_threshold:
+                    if s_time > late_in_threshold:
                         flag = "late in"
                 except Exception:
                     # leave flag as-is
@@ -220,7 +210,11 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                     elif e_time < sh_end:
                         flag = "early out"
                     else:
-                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                        try:
+                            grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
+                        except Exception:
+                            grace_minutes = 15
+                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=grace_minutes)).time()
                         try:
                             if e_time <= normal_out_threshold:
                                 if flag != "late in":
@@ -249,7 +243,11 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                         except Exception:
                             flag = "overtime"
                 else:
-                    normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                    try:
+                        grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
+                    except Exception:
+                        grace_minutes = 15
+                    normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=grace_minutes)).time()
                     try:
                         if e_time <= normal_out_threshold:
                             if flag != "late in":
@@ -336,10 +334,20 @@ def get_shift_info_with_capped(emp_id: str, work_status: str, start_time: Any, e
             if sh_end:
                 shift_end_dt = datetime.combine(date_part, sh_end)
                 try:
+                    # Get the grace period for late checkout
+                    grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
+                except Exception:
+                    grace_minutes = 15
+
+                try:
                     cap_hours = int(get_setting("shift_cap_hours") or 8)
                 except Exception:
                     cap_hours = 8
-                cap_dt = shift_end_dt + timedelta(hours=cap_hours)
+
+                # Add grace minutes to shift end before calculating cap time
+                grace_adjusted_end = shift_end_dt + timedelta(minutes=grace_minutes)
+                # Then add cap hours
+                cap_dt = grace_adjusted_end + timedelta(hours=cap_hours)
                 if datetime.now() >= cap_dt:
                     return chosen_shift_name, "no checkout"
         except Exception:
@@ -739,7 +747,7 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
         # Get shift information
         shift_name = first_row.get("shift_name", "")
 
-    # Count different shift flags
+        # Count different shift flags
         late_in_count = len(group[group["shift_flag"] == "late in"])
         early_out_count = len(group[group["shift_flag"] == "early out"])
         late_checkout_count = len(group[group["shift_flag"] == "late checkout"])
@@ -916,7 +924,7 @@ def write_excel(
 
     if "AttendanceSummary" in wb.sheetnames:
         ws = wb["AttendanceSummary"]
-    # Apply our excel-specific flag-based highlighting (overtime, late in, no checkout)
+        # Apply our excel-specific flag-based highlighting (overtime, late in, no checkout)
         try:
             apply_flag_highlighting(ws)
         except Exception:

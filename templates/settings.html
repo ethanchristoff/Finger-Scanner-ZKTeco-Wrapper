@@ -8,7 +8,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                • <em>Shift cap hours</em> controls how many hours after the shift end + grace period the system will wait before marking a worked day as "no checkout". Default is 8 hours.<br>
+                    • <em>Late checkout grace period</em> controls how many minutes after shift end a checkout is still considered "normal" instead of "overtime". Default is 15 minutes.<br>
+                    • <em>Shift cap behavior</em> determines how to handle work hours for shift-capped entries - either count up to the cap time or zero them out completely.<br>
+                    • Early check-ins are no longer flagged and are considered normal arrivals.-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -296,10 +299,7 @@
                         <input type="number" name="shift_cap_hours" id="shift_cap_hours" min="1" step="1" value="{{ current_shift_cap }}" />
                     </div>
 
-                    <div class="form-group">
-                        <label for="early_checkin_minutes">Early check-in window (minutes before shift start):</label>
-                        <input type="number" name="early_checkin_minutes" id="early_checkin_minutes" min="0" step="1" value="{{ current_early_checkin }}" />
-                    </div>
+                    <!-- Early check-in has been removed, all early check-ins are now considered normal -->
 
                     <div class="form-group">
                         <label for="late_checkout_grace_minutes">Late checkout grace period (minutes after shift end):</label>

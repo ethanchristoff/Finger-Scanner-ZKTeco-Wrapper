@@ -1,9 +1,10 @@
+import contextlib
 from datetime import timedelta
 from typing import Any
 
 import pandas as pd
 
-from .db_queries import get_user_shift_mappings, get_comprehensive_employee_data, get_setting
+from .db_queries import get_comprehensive_employee_data, get_setting, get_user_shift_mappings
 
 NOON_HOUR = 12
 SUNDAY_WEEKDAY = 6
@@ -24,10 +25,7 @@ def get_shift_mappings() -> dict[str, dict[str, Any]]:
 
 def get_device_for_time(group: pd.DataFrame, time_col: str, device_col: str, operation: str) -> Any:
     """Get device for min/max time in a group."""
-    if operation == "min":
-        idx = group[time_col].idxmin()
-    else:
-        idx = group[time_col].idxmax()
+    idx = group[time_col].idxmin() if operation == "min" else group[time_col].idxmax()
     return group.loc[idx, device_col]
 
 
@@ -77,9 +75,6 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         if shift_end_dt <= shift_start_dt:
             shift_end_dt = shift_end_dt + timedelta(days=1)
 
-        # Calculate expected shift duration and the next shift start (assume next day's shift_start)
-        expected_duration = shift_end_dt - shift_start_dt
-        next_shift_start_dt = shift_start_dt + timedelta(days=1)
         # grace deadline after shift end (15 minutes)
         grace_dt = shift_end_dt + timedelta(minutes=15)
 
@@ -87,11 +82,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         # and set end_time to the grace deadline for time counting (employee didn't checkout)
         if pd.isna(end_time) or forced_no_checkout:
             # If forced_no_checkout, close at scheduled shift_end (end_use set to shift_end_dt)
-            if forced_no_checkout:
-                end_use = shift_end_dt
-            else:
-                # If start_time is after grace_dt for some odd reason, count from start_time to start_time (0)
-                end_use = grace_dt if grace_dt > start_time else start_time
+            end_use = shift_end_dt if forced_no_checkout else max(start_time, grace_dt)
             time_spent_td = end_use - start_time if end_use and end_use > start_time else timedelta(0)
             time_spent_str = str(time_spent_td).split(".")[0]
             return time_spent_str, True, end_use
@@ -107,23 +98,24 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
 
         # Calculate cap_dt (cap time) - time at which shift is capped
         cap_hours = 8  # Default to 8 hours if not configured
-        try:
+        with contextlib.suppress(Exception):
             cap_hours = int(get_setting("shift_cap_hours") or 8)
+
+        # Get the grace period for late checkout
+        try:
+            grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
         except Exception:
-            pass
-        cap_dt = shift_end_dt + timedelta(hours=cap_hours)
-        
+            grace_minutes = 15
+
+        # Calculate cap time from shift end + grace period + cap hours
+        # This ensures cap only starts counting after the grace period
+        cap_dt = shift_end_dt + timedelta(minutes=grace_minutes) + timedelta(hours=cap_hours)
+
         # If the recorded checkout is at or after the cap time, treat as shift_capped and use cap_dt as the effective end
         if end_time >= cap_dt:
             # Check if we should zero out work hours for shift_capped entries
             shift_cap_type = get_setting("shift_cap_type") or "normal"
-            if shift_cap_type == "zero":
-                # Zero out the work hours if shift cap type is set to zero
-                time_spent_str = "0:00:00"
-            else:
-                # Otherwise, count up to the cap time
-                time_spent_td = cap_dt - start_time
-                time_spent_str = str(time_spent_td).split(".")[0]
+            time_spent_str = "0:00:00" if shift_cap_type == "zero" else str(cap_dt - start_time).split(".")[0]
             return time_spent_str, True, cap_dt
 
         # Otherwise, the employee checked out before or at shift end — normal/early out
@@ -135,7 +127,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         cap_hours = int(get_setting("shift_cap_hours") or 8)
     except Exception:
         cap_hours = 8  # Default to 8 hours if not configured
-        
+
     cap_duration = timedelta(hours=cap_hours)
     # If there's no end_time, treat as no_checkout and count up to start_time + cap_hours window
     if pd.isna(end_time):
@@ -156,12 +148,8 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         # Check if we should zero out work hours for shift_capped entries
         shift_cap_type = get_setting("shift_cap_type") or "normal"
         cap_dt = start_time + cap_duration
-        if shift_cap_type == "zero":
-            # Zero out the work hours if shift cap type is set to zero
-            time_spent_str = "0:00:00"
-        else:
-            # Otherwise, count up to the cap time
-            time_spent_str = str(cap_duration).split(".")[0]
+        # Zero out the work hours if shift cap type is set to zero, otherwise count up to the cap time
+        time_spent_str = "0:00:00" if shift_cap_type == "zero" else str(cap_duration).split(".")[0]
         return time_spent_str, True, cap_dt
 
     time_spent_str = str(time_diff).split(".")[0]
@@ -275,7 +263,7 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
                     "end_device_sn": "",
                     "time_spent": "0:00:00",
                     "work_status": "absent",
-                        "no_checkout": False,
+                    "no_checkout": False,
                 }
             )
 
