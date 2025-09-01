@@ -34,6 +34,20 @@ def create_settings_table():
     """
     query_db(early_query)
 
+    # late_checkout_grace_minutes: minutes after shift end before considering as late checkout (default 15)
+    late_grace_query = """
+    INSERT IGNORE INTO settings (setting_key, setting_value, description)
+    VALUES ('late_checkout_grace_minutes', '15', 'Minutes after shift end before considering a checkout as late')
+    """
+    query_db(late_grace_query)
+
+    # shift_cap_type: how to handle work hours when shift cap is applied ('zero' or 'normal') - default 'normal'
+    shift_cap_query = """
+    INSERT IGNORE INTO settings (setting_key, setting_value, description)
+    VALUES ('shift_cap_type', 'zero', 'How to handle shift capping: "zero" zeroes work hours, "normal" calculates normally')
+    """
+    query_db(shift_cap_query)
+
 
 def get_setting(setting_key: str) -> str:
     """Get a setting value by key."""

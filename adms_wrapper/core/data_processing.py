@@ -3,7 +3,7 @@ from typing import Any
 
 import pandas as pd
 
-from .db_queries import get_user_shift_mappings, get_comprehensive_employee_data
+from .db_queries import get_user_shift_mappings, get_comprehensive_employee_data, get_setting
 
 NOON_HOUR = 12
 SUNDAY_WEEKDAY = 6
@@ -105,40 +105,67 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
                 # if adjustment fails, leave as-is
                 pass
 
+        # Calculate cap_dt (cap time) - time at which shift is capped
+        cap_hours = 8  # Default to 8 hours if not configured
+        try:
+            cap_hours = int(get_setting("shift_cap_hours") or 8)
+        except Exception:
+            pass
+        cap_dt = shift_end_dt + timedelta(hours=cap_hours)
+        
         # If the recorded checkout is at or after the cap time, treat as shift_capped and use cap_dt as the effective end
         if end_time >= cap_dt:
-            time_spent_td = cap_dt - start_time
-            time_spent_str = str(time_spent_td).split(".")[0]
+            # Check if we should zero out work hours for shift_capped entries
+            shift_cap_type = get_setting("shift_cap_type") or "normal"
+            if shift_cap_type == "zero":
+                # Zero out the work hours if shift cap type is set to zero
+                time_spent_str = "0:00:00"
+            else:
+                # Otherwise, count up to the cap time
+                time_spent_td = cap_dt - start_time
+                time_spent_str = str(time_spent_td).split(".")[0]
             return time_spent_str, True, cap_dt
 
         # Otherwise, the employee checked out before or at shift end — normal/early out
         time_spent_td = time_diff if time_diff is not None else (end_time - start_time)
         time_spent_str = str(time_spent_td).split(".")[0]
         return time_spent_str, False, end_time
-    else:
-        # No shift assigned - apply 8-hour cap
-        eight_hours = timedelta(hours=8)
-        # If there's no end_time, treat as no_checkout and count up to start_time + 8h window
-        if pd.isna(end_time):
-            cap_dt = start_time + eight_hours
-            # Use cap_dt as conservative counting endpoint when no shift is known
-            time_spent_str = str(eight_hours).split(".")[0]
-            return time_spent_str, True, cap_dt
+    # No shift assigned - apply configurable cap hours
+    try:
+        cap_hours = int(get_setting("shift_cap_hours") or 8)
+    except Exception:
+        cap_hours = 8  # Default to 8 hours if not configured
+        
+    cap_duration = timedelta(hours=cap_hours)
+    # If there's no end_time, treat as no_checkout and count up to start_time + cap_hours window
+    if pd.isna(end_time):
+        cap_dt = start_time + cap_duration
+        # Use cap_dt as conservative counting endpoint when no shift is known
+        time_spent_str = str(cap_duration).split(".")[0]
+        return time_spent_str, True, cap_dt
 
-        # If end_time appears to be earlier than start_time (overnight), roll forward one day
-        if end_time <= start_time:
-            try:
-                end_time = end_time + timedelta(days=1)
-                time_diff = end_time - start_time
-            except Exception:
-                pass
+    # If end_time appears to be earlier than start_time (overnight), roll forward one day
+    if end_time <= start_time:
+        try:
+            end_time = end_time + timedelta(days=1)
+            time_diff = end_time - start_time
+        except Exception:
+            pass
 
-        if time_diff and time_diff > eight_hours:
-            time_spent_str = str(eight_hours).split(".")[0]
-            return time_spent_str, True, start_time + eight_hours
+    if time_diff and time_diff > cap_duration:
+        # Check if we should zero out work hours for shift_capped entries
+        shift_cap_type = get_setting("shift_cap_type") or "normal"
+        cap_dt = start_time + cap_duration
+        if shift_cap_type == "zero":
+            # Zero out the work hours if shift cap type is set to zero
+            time_spent_str = "0:00:00"
+        else:
+            # Otherwise, count up to the cap time
+            time_spent_str = str(cap_duration).split(".")[0]
+        return time_spent_str, True, cap_dt
 
-        time_spent_str = str(time_diff).split(".")[0]
-        return time_spent_str, False, end_time
+    time_spent_str = str(time_diff).split(".")[0]
+    return time_spent_str, False, end_time
 
 
 def process_attendance_entries(df_att: pd.DataFrame, shift_dict: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:

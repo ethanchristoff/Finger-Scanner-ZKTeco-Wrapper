@@ -301,13 +301,28 @@
                         <input type="number" name="early_checkin_minutes" id="early_checkin_minutes" min="0" step="1" value="{{ current_early_checkin }}" />
                     </div>
 
+                    <div class="form-group">
+                        <label for="late_checkout_grace_minutes">Late checkout grace period (minutes after shift end):</label>
+                        <input type="number" name="late_checkout_grace_minutes" id="late_checkout_grace_minutes" min="0" step="1" value="{{ current_late_checkout_grace }}" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="shift_cap_type">Shift cap behavior:</label>
+                        <select name="shift_cap_type" id="shift_cap_type">
+                            <option value="normal" {% if current_shift_cap_type == 'normal' %}selected{% endif %}>Normal (count hours up to cap)</option>
+                            <option value="zero" {% if current_shift_cap_type == 'zero' %}selected{% endif %}>Zero out hours (show 0:00:00)</option>
+                        </select>
+                    </div>
+
                     <button type="submit" class="btn">💾 Save Shift Settings</button>
                 </form>
 
                 <div class="info-box">
                     <strong>ℹ️ Notes:</strong>
                     • <em>Shift cap hours</em> controls how long after a shift's scheduled end the system will wait before marking a worked day as "no checkout". Default is 8 hours.<br>
-                    • <em>Early check-in window</em> controls how many minutes before shift start a check-in is considered an "early in". Default is 30 minutes.
+                    • <em>Early check-in window</em> controls how many minutes before shift start a check-in is considered an "early in". Default is 30 minutes.<br>
+                    • <em>Late checkout grace period</em> controls how many minutes after shift end a checkout is still considered "normal" instead of "overtime". Default is 15 minutes.<br>
+                    • <em>Shift cap behavior</em> determines how to handle work hours for shift-capped entries - either count up to the cap time or zero them out completely.
                 </div>
             </div>
             

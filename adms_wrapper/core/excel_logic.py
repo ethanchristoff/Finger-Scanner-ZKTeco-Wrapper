@@ -198,7 +198,12 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                 if (sh_start_dt and e_dt < sh_start_dt) or e_dt < sh_end_dt:
                     flag = "early out"
                 else:
-                    normal_threshold_dt = sh_end_dt + timedelta(minutes=15)
+                    # Use configurable late checkout grace from settings (minutes after shift end to consider normal)
+                    try:
+                        grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
+                    except Exception:
+                        grace_minutes = 15
+                    normal_threshold_dt = sh_end_dt + timedelta(minutes=grace_minutes)
                     # Any checkout after the normal grace window is considered a late checkout
                     if e_dt <= normal_threshold_dt:
                         # Within normal grace window
@@ -229,7 +234,12 @@ def determine_shift_flag(start_time: Any, end_time: Any, shift_start: Any, shift
                     if e_time < sh_end:
                         flag = "early out"
                     else:
-                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=15)).time()
+                        # Use configurable late checkout grace from settings (minutes after shift end to consider normal)
+                        try:
+                            grace_minutes = int(get_setting("late_checkout_grace_minutes") or 15)
+                        except Exception:
+                            grace_minutes = 15
+                        normal_out_threshold = (datetime.combine(today, sh_end) + timedelta(minutes=grace_minutes)).time()
                         try:
                             if e_time <= normal_out_threshold:
                                 if flag != "late in":

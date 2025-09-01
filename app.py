@@ -1116,6 +1116,9 @@ def settings() -> Any:
             # Save shift-related numeric settings
             shift_cap_hours = request.form.get("shift_cap_hours")
             early_checkin_minutes = request.form.get("early_checkin_minutes")
+            late_checkout_grace_minutes = request.form.get("late_checkout_grace_minutes")
+            shift_cap_type = request.form.get("shift_cap_type")
+            
             errors = False
             try:
                 if shift_cap_hours is not None and str(shift_cap_hours).strip() != "":
@@ -1132,6 +1135,20 @@ def settings() -> Any:
             except Exception:
                 flash("early_checkin_minutes must be an integer", "error")
                 errors = True
+                
+            try:
+                if late_checkout_grace_minutes is not None and str(late_checkout_grace_minutes).strip() != "":
+                    int(late_checkout_grace_minutes)
+                    set_setting("late_checkout_grace_minutes", str(late_checkout_grace_minutes), "Minutes after shift end before checkout is considered overtime")
+            except Exception:
+                flash("late_checkout_grace_minutes must be an integer", "error")
+                errors = True
+                
+            # Set shift cap type - either "normal" or "zero"
+            if shift_cap_type in ["normal", "zero"]:
+                set_setting("shift_cap_type", shift_cap_type, "How to handle hours for shift-capped entries")
+            else:
+                set_setting("shift_cap_type", "normal", "How to handle hours for shift-capped entries")  # Default to normal if invalid
 
             if not errors:
                 flash("Shift settings saved successfully", "success")
@@ -1144,12 +1161,16 @@ def settings() -> Any:
         all_shifts = get_shift_templates()
         current_shift_cap = get_setting("shift_cap_hours") or "8"
         current_early_checkin = get_setting("early_checkin_minutes") or "30"
+        current_late_checkout_grace = get_setting("late_checkout_grace_minutes") or "15"
+        current_shift_cap_type = get_setting("shift_cap_type") or "normal"
     except Exception as e:
         flash(f"Error loading settings: {e!s}", "error")
         current_default_shift = None
         all_shifts = []
         current_shift_cap = "8"
         current_early_checkin = "30"
+        current_late_checkout_grace = "15"
+        current_shift_cap_type = "normal"
 
     return render_template(
         "settings.html",
@@ -1157,6 +1178,8 @@ def settings() -> Any:
         all_shifts=all_shifts,
         current_shift_cap=current_shift_cap,
         current_early_checkin=current_early_checkin,
+        current_late_checkout_grace=current_late_checkout_grace,
+        current_shift_cap_type=current_shift_cap_type,
     )
 
 
