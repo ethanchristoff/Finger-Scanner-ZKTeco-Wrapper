@@ -424,6 +424,14 @@
                         <span class="legend-badge badge-late-in">LATE IN</span>
                         <span>Checked in after allowed grace period</span>
                     </div>
+                    <div class="legend-item">
+                        <span class="legend-badge" style="background: #4299e1; color: #90cdf4;">EARLY OUT</span>
+                        <span>Left before shift end time</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-badge" style="background: #276749; color: #9ae6b4;">NORMAL</span>
+                        <span>Regular attendance within shift hours</span>
+                    </div>
                 </div>
             </div>
 
@@ -492,17 +500,17 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if row.shift_flag == "overtime" %}
+                                {% if row.shift_flag|lower == "overtime" %}
                                     <span class="status-badge status-overtime" title="Overtime checkout">OVERTIME</span>
-                                {% elif row.shift_flag == "late in" %}
+                                {% elif row.shift_flag|lower == "late in" %}
                                     <span class="status-badge status-late-in" title="Late check-in - after grace period">LATE IN</span>
                                 {% elif row.early_in %}
                                     <span class="status-badge status-early-in" title="Early check-in - before shift">EARLY IN</span>
-                                {% elif row.shift_flag == "early out" %}
+                                {% elif row.shift_flag|lower == "early out" %}
                                     <span class="status-badge status-early-out">EARLY OUT</span>
-                                {% elif row.no_checkout %}
+                                {% elif row.shift_flag|lower == "no checkout" or row.no_checkout %}
                                     <span class="status-badge status-capped">NO CHECKOUT</span>
-                                {% elif row.shift_flag == "normal" %}
+                                {% elif row.shift_flag|lower == "normal" %}
                                     <span class="status-badge status-normal">NORMAL</span>
                                 {% else %}
                                     <span class="status-badge status-normal">NORMAL</span>

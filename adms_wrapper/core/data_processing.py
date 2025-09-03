@@ -152,6 +152,8 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
             shift_flag = "normal"
 
         if is_capped:
+            # Always set shift_flag to "no checkout" when capped
+            shift_flag = "no checkout"
             if should_zero:
                 return "0:00:00", True, False, cap_deadline, shift_flag, is_late_in
             else:
@@ -187,6 +189,8 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
     is_late_in = False  # Cannot determine late-in without shift start time
 
     if is_capped:
+        # Ensure shift_flag is "no checkout" for consistency
+        shift_flag = "no checkout"
         if should_zero:
             return "0:00:00", True, False, cap_deadline, shift_flag, is_late_in
         effective_end_time = min(end_time if pd.notna(end_time) else cap_deadline, cap_deadline)
