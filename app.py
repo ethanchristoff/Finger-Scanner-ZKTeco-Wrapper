@@ -1062,7 +1062,9 @@ def bulk_employee_upload() -> Any:
                         continue
 
                     # Upsert comprehensive employee (bulk upload should overwrite existing records)
-                    upsert_comprehensive_employee(emp_no, emp_name, designation, branch)
+                    # Get the default shift (will be used if provided shift is empty)
+                    default_shift = get_default_shift()
+                    upsert_comprehensive_employee(emp_no, emp_name, designation, branch, default_shift)
                     success_count += 1
 
                     # Update name map so subsequent rows in the same upload see the new mapping
@@ -1076,6 +1078,11 @@ def bulk_employee_upload() -> Any:
             # Show results
             if success_count > 0:
                 flash(f"Successfully added {success_count} employee(s).", "success")
+                default_shift = get_default_shift()
+                if default_shift:
+                    flash(f"All employees were assigned the default shift: {default_shift}", "success")
+                else:
+                    flash("Warning: No default shift was set. Please configure a default shift in Settings.", "error")
 
             if error_count > 0:
                 flash(f"Failed to add {error_count} employee(s). Errors:", "error")
