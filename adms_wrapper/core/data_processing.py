@@ -122,13 +122,13 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
 
         # Check for late check-in
         is_late_in = pd.notna(start_time) and start_time > (shift_start_dt + timedelta(minutes=late_in_grace_minutes))
-        
+
         # Determine overtime cutoff - when a checkout is considered overtime
         overtime_cutoff = shift_end_dt + timedelta(minutes=grace_minutes)
-        
+
         # Determine cap deadline - when a shift is considered to have no checkout
         cap_deadline = shift_end_dt + timedelta(minutes=grace_minutes) + timedelta(hours=cap_hours)
-        
+
         is_capped = pd.isna(end_time) or (pd.notna(end_time) and end_time > cap_deadline)
         is_overtime = pd.notna(end_time) and end_time > overtime_cutoff and not is_capped
 
@@ -258,7 +258,7 @@ def generate_complete_records(worked_summary: pd.DataFrame, start_date: str | No
                         "no_checkout": False,
                         "early_checkout": False,
                         "shift_flag": "absent",
-                        "late_in": False
+                        "late_in": False,
                     }
                 )
 
@@ -293,9 +293,9 @@ def generate_absent_days_for_date_range(start_date: str, end_date: str) -> list[
                     "time_spent": "0:00:00",
                     "work_status": "absent",
                     "no_checkout": False,
-                    "early_checkout": False, 
+                    "early_checkout": False,
                     "shift_flag": "absent",
-                    "late_in": False
+                    "late_in": False,
                 }
             )
     return absent_records
@@ -307,11 +307,11 @@ def _get_absent_days_fallback(start_date: str | None, end_date: str | None) -> p
         absent_records = generate_absent_days_for_date_range(start_date, end_date)
         if absent_records:
             return pd.DataFrame(absent_records)
-    
+
     # Define all columns to avoid errors on empty DataFrame
-    return pd.DataFrame(columns=["employee_id", "day", "start_time", "end_time", "start_device_sn",
-                                 "end_device_sn", "time_spent", "work_status", "no_checkout",
-                                 "early_checkout", "shift_flag", "late_in"])
+    return pd.DataFrame(
+        columns=["employee_id", "day", "start_time", "end_time", "start_device_sn", "end_device_sn", "time_spent", "work_status", "no_checkout", "early_checkout", "shift_flag", "late_in"]
+    )
 
 
 def process_attendance_summary(attendences: list[dict[str, Any]], start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame:
@@ -326,7 +326,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
 
     if not required_cols.issubset(df_att.columns):
         return _get_absent_days_fallback(start_date, end_date)
-    
+
     df_att["employee_id"] = df_att["employee_id"].apply(lambda x: "" if pd.isna(x) else str(x).strip())
     df_att = df_att[df_att["employee_id"] != ""]
 
@@ -344,7 +344,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
         while i < n:
             st_row = emp_df_sorted.loc[i]
             st = st_row["timestamp"]
-            
+
             boundary_dt = None
             shift_info = shift_dict.get(emp) or shift_dict.get("default")
 
@@ -388,16 +388,30 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
 
             if candidate_index is not None:
                 end_row = emp_df_sorted.loc[candidate_index]
-                worked_rows.append({
-                    "employee_id": emp, "day": st.date(), "start_time": st, "end_time": end_row["timestamp"],
-                    "start_device_sn": st_row.get("sn", ""), "end_device_sn": end_row.get("sn", ""), "work_status": "worked",
-                })
+                worked_rows.append(
+                    {
+                        "employee_id": emp,
+                        "day": st.date(),
+                        "start_time": st,
+                        "end_time": end_row["timestamp"],
+                        "start_device_sn": st_row.get("sn", ""),
+                        "end_device_sn": end_row.get("sn", ""),
+                        "work_status": "worked",
+                    }
+                )
                 i = candidate_index + 1
             else:
-                worked_rows.append({
-                    "employee_id": emp, "day": st.date(), "start_time": st, "end_time": pd.NaT,
-                    "start_device_sn": st_row.get("sn", ""), "end_device_sn": "", "work_status": "worked",
-                })
+                worked_rows.append(
+                    {
+                        "employee_id": emp,
+                        "day": st.date(),
+                        "start_time": st,
+                        "end_time": pd.NaT,
+                        "start_device_sn": st_row.get("sn", ""),
+                        "end_device_sn": "",
+                        "work_status": "worked",
+                    }
+                )
                 i += 1
 
     if not worked_rows:
@@ -411,7 +425,7 @@ def process_attendance_summary(attendences: list[dict[str, Any]], start_date: st
     worked_summary["early_checkout"] = time_results[2]
     worked_summary["end_time"] = time_results[3]
     worked_summary["shift_flag"] = time_results[4]  # Add the new shift_flag column
-    worked_summary["late_in"] = time_results[5]     # Add the late_in flag column
+    worked_summary["late_in"] = time_results[5]  # Add the late_in flag column
 
     complete_records = generate_complete_records(worked_summary, start_date, end_date)
     summary = pd.DataFrame(complete_records)
