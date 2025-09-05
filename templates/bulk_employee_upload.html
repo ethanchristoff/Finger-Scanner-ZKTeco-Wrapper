@@ -252,7 +252,7 @@
                 <h3>📋 How to Upload Employees in Bulk</h3>
                 <ol>
                     <li>Download the Excel template below to see the required format</li>
-                    <li>Fill in your employee data using the exact column headers: <strong>EMP No</strong>, <strong>EMP Name</strong>, <strong>Branch</strong>, <strong>Designation</strong></li>
+                    <li>Fill in your employee data using the exact column headers: <strong>EMP No</strong>, <strong>EMP Name</strong>, <strong>Designation</strong></li>
                     <li>Save your file as an Excel format (.xlsx or .xls)</li>
                     <li>Upload your completed file using the form below</li>
                     <li>Review the results and fix any errors if needed</li>
@@ -267,7 +267,6 @@
                             <tr>
                                 <th>EMP No</th>
                                 <th>EMP Name</th>
-                                <th>Branch</th>
                                 <th>Designation</th>
                             </tr>
                         </thead>
@@ -275,13 +274,11 @@
                             <tr>
                                 <td>001</td>
                                 <td>John Smith</td>
-                                <td>Main Office</td>
                                 <td>Manager</td>
                             </tr>
                             <tr>
                                 <td>002</td>
                                 <td>Jane Doe</td>
-                                <td>Branch A</td>
                                 <td>Developer</td>
                             </tr>
                         </tbody>
@@ -310,6 +307,22 @@
                 
                 <form method="POST" enctype="multipart/form-data">
                     <div class="form-group">
+                        <label for="selected_branch">Select Branch:</label>
+                        <select id="selected_branch" name="selected_branch" required style="width: 100%; padding: 12px; background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; border-radius: 8px;">
+                            {% if branches and branches|length > 0 %}
+                                <option value="" disabled selected>-- Choose a branch --</option>
+                                {% for b in branches %}
+                                    <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="" disabled selected>No branches available. Add a branch mapping first.</option>
+                            {% endif %}
+                        </select>
+                        {% if not branches or branches|length == 0 %}
+                        <div style="margin-top:8px; color:#fc8181;">No branches found. Please add a device or employee branch mapping first.</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
                         <label for="file">Select Excel File:</label>
                         <div class="file-input" onclick="document.getElementById('file').click()">
                             <input type="file" id="file" name="file" accept=".xlsx,.xls" required>
@@ -319,7 +332,7 @@
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" {% if not branches or branches|length == 0 %}disabled title="No branches available"{% endif %}>
                         <span>🚀</span> Upload and Process
                     </button>
                 </form>

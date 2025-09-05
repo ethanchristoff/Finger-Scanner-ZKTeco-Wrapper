@@ -966,11 +966,11 @@ def download_filtered_attendance() -> Any:
 @app.route("/download_employee_template")
 def download_employee_template() -> Any:
     """Download Excel template for bulk employee upload."""
-    # Create sample data for the template
+    # Create sample data for the template (Branch removed; selected on the page)
     template_data = [
-        {"EMP No": "001", "EMP Name": "John Smith", "Branch": "Main Office", "Designation": "Manager"},
-        {"EMP No": "002", "EMP Name": "Jane Doe", "Branch": "Branch A", "Designation": "Developer"},
-        {"EMP No": "003", "EMP Name": "Bob Johnson", "Branch": "Branch B", "Designation": "Analyst"},
+        {"EMP No": "001", "EMP Name": "John Smith", "Designation": "Manager"},
+        {"EMP No": "002", "EMP Name": "Jane Doe", "Designation": "Developer"},
+        {"EMP No": "003", "EMP Name": "Bob Johnson", "Designation": "Analyst"},
     ]
 
     # Create DataFrame
@@ -988,6 +988,12 @@ def download_employee_template() -> Any:
 def bulk_employee_upload() -> Any:
     """Handle bulk employee upload from Excel file."""
     if request.method == "POST":
+        # Require selected branch from dropdown
+        selected_branch = request.form.get("selected_branch", "").strip()
+        if not selected_branch:
+            flash("Please select a branch before uploading.", "error")
+            return redirect(url_for("bulk_employee_upload"))
+
         # Check if file was uploaded
         if "file" not in request.files:
             flash("No file selected. Please choose an Excel file to upload.", "error")
@@ -1010,7 +1016,7 @@ def bulk_employee_upload() -> Any:
             df = pd.read_excel(file)
 
             # Validate required columns
-            required_columns = ["EMP No", "EMP Name", "Branch", "Designation"]
+            required_columns = ["EMP No", "EMP Name", "Designation"]  # Branch removed; chosen via dropdown
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
@@ -1030,7 +1036,6 @@ def bulk_employee_upload() -> Any:
                 try:
                     emp_no = str(row["EMP No"]).strip()
                     emp_name = str(row["EMP Name"]).strip()
-                    branch = str(row["Branch"]).strip()
                     designation = str(row["Designation"]).strip()
 
                     # Validate required fields
@@ -1041,11 +1046,6 @@ def bulk_employee_upload() -> Any:
 
                     if not emp_name or emp_name == "nan":
                         errors.append(f"Row {index + 2}: Employee Name is required")
-                        error_count += 1
-                        continue
-
-                    if not branch or branch == "nan":
-                        errors.append(f"Row {index + 2}: Branch is required")
                         error_count += 1
                         continue
 
@@ -1064,7 +1064,8 @@ def bulk_employee_upload() -> Any:
                     # Upsert comprehensive employee (bulk upload should overwrite existing records)
                     # Get the default shift (will be used if provided shift is empty)
                     default_shift = get_default_shift()
-                    upsert_comprehensive_employee(emp_no, emp_name, designation, branch, default_shift)
+                    # Use the selected branch for all rows
+                    upsert_comprehensive_employee(emp_no, emp_name, designation, selected_branch, default_shift)
                     success_count += 1
 
                     # Update name map so subsequent rows in the same upload see the new mapping
@@ -1077,7 +1078,7 @@ def bulk_employee_upload() -> Any:
 
             # Show results
             if success_count > 0:
-                flash(f"Successfully added {success_count} employee(s).", "success")
+                flash(f"Successfully added {success_count} employee(s) to branch '{selected_branch}'.", "success")
                 default_shift = get_default_shift()
                 if default_shift:
                     flash(f"All employees were assigned the default shift: {default_shift}", "success")
@@ -1096,8 +1097,15 @@ def bulk_employee_upload() -> Any:
 
         return redirect(url_for("bulk_employee_upload"))
 
-    # GET request - show upload form
-    return render_template("bulk_employee_upload.html")
+    # GET request - show upload form with available branches
+    try:
+        device_branches = {m.get("branch_name") for m in (get_device_branch_mappings() or []) if m.get("branch_name")}
+        employee_branches = {m.get("branch_name") for m in (get_employee_branch_mappings() or []) if m.get("branch_name")}
+        branches = sorted(device_branches | employee_branches)
+    except Exception:
+        branches = []
+
+    return render_template("bulk_employee_upload.html", branches=branches)
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -1182,4 +1190,4 @@ def settings() -> Any:
 
 if __name__ == "__main__":
     ensure_directories_exist()
-    app.run(host="0.0.0.0", port=5050, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
