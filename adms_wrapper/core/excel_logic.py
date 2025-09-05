@@ -747,20 +747,49 @@ def create_employee_summary_sheet(summary_df: pd.DataFrame) -> pd.DataFrame:
         # Get shift information
         shift_name = first_row.get("shift_name", "")
 
-        # Count different shift flags
-        late_in_count = len(group[group["shift_flag"] == "late in"])
-        early_out_count = len(group[group["shift_flag"] == "early out"])
-        late_checkout_count = len(group[group["shift_flag"] == "late checkout"])
-        on_time_count = len(group[group["shift_flag"] == "on time"])
+        # Count different shift flags (only on worked days), normalizing names and using booleans when available
+        worked_mask = group["work_status"].astype(str).str.lower() == "worked"
+
+        # Normalize shift_flag values for robust counting across pipelines
+        flag_series = group.get("shift_flag", pd.Series([""] * len(group), index=group.index))
+        flag_norm = (
+            flag_series.astype(str)
+            .str.strip()
+            .str.lower()
+            .replace(
+                {
+                    "shift capped": "no checkout",
+                    "shift cap": "no checkout",
+                    "shiftcap": "no checkout",
+                    "latein": "late in",
+                    "earlyin": "early in",
+                    "earlyout": "early out",
+                    "over time": "overtime",
+                }
+            )
+        )
+
+        # Prefer boolean late_in when present; otherwise fall back to flag
+        late_in_count = int(group.loc[worked_mask, "late_in"].fillna(False).astype(bool).sum()) if "late_in" in group.columns else int((flag_norm.eq("late in") & worked_mask).sum())
+
+        early_out_count = int((flag_norm.eq("early out") & worked_mask).sum())
+
+        # Treat both 'late checkout' and 'overtime' as late checkout days in the summary
+        late_checkout_count = int((flag_norm.isin(["late checkout", "overtime"]) & worked_mask).sum())
+
+        # Treat both 'on time' and 'normal' as on-time days
+        on_time_count = int((flag_norm.isin(["on time", "normal"]) & worked_mask).sum())
+
         # Safely count rows marked as no_checkout. If the column is missing, treat as zero.
         if "no_checkout" in group.columns:
             try:
-                no_checkout_count = int(group["no_checkout"].fillna(False).astype(bool).sum())
+                no_checkout_count = int(group.loc[worked_mask, "no_checkout"].fillna(False).astype(bool).sum())
             except Exception:
                 # If conversion fails for any unexpected reason, fallback to len of truthy values
-                no_checkout_count = int(sum(1 for v in group["no_checkout"] if bool(v)))
+                no_checkout_count = int(sum(1 for v in group.loc[worked_mask, "no_checkout"] if bool(v)))
         else:
-            no_checkout_count = 0
+            # Fallback: count rows where normalized flag indicates 'no checkout'
+            no_checkout_count = int((flag_norm.eq("no checkout") & worked_mask).sum())
 
         # Calculate attendance percentage
         attendance_percentage = (worked_days / total_days * 100) if total_days > 0 else 0
