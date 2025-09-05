@@ -138,16 +138,18 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
         except (ValueError, TypeError):
             should_zero = True
 
-        # Determine shift flag based on status
+        # Determine shift flag based on status (priority: no checkout > early out > late in > overtime > normal)
+        early_out = pd.notna(end_time) and end_time < shift_end_dt
+
         if is_capped:
             shift_flag = "no checkout"
+        elif early_out:
+            is_early_checkout = True
+            shift_flag = "early out"
         elif is_late_in:
             shift_flag = "late in"
         elif is_overtime:
             shift_flag = "overtime"
-        elif pd.notna(end_time) and end_time < shift_end_dt:
-            is_early_checkout = True
-            shift_flag = "early out"
         else:
             shift_flag = "normal"
 
@@ -162,7 +164,7 @@ def calculate_time_spent_and_flag(row: pd.Series, shift_dict: dict[str, dict[str
                 return _format_timedelta(time_spent_td), True, False, cap_deadline, shift_flag, is_late_in
         else:
             # Only if not capped can an employee be early.
-            if pd.notna(end_time) and end_time < shift_end_dt:
+            if early_out:
                 is_early_checkout = True
             time_spent_td = end_time - start_time
             return _format_timedelta(time_spent_td), False, is_early_checkout, end_time, shift_flag, is_late_in

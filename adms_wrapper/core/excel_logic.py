@@ -431,6 +431,13 @@ def apply_shift_mappings(summary_df: pd.DataFrame, shift_mappings: list[dict[str
         else:
             shift_name, flag = get_shift_info_with_capped(row["employee_id"], row["work_status"], row["start_time"], row["end_time"], shift_df)
 
+        # If early checkout is true, it takes priority over any non "no checkout" flag
+        try:
+            if not no_checkout and bool(row.get("early_checkout", False)):
+                flag = "early out"
+        except Exception:
+            pass
+
         summary_df.loc[idx, "shift_name"] = shift_name
         summary_df.loc[idx, "shift_flag"] = flag
 
