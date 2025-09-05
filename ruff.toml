@@ -117,3 +117,9 @@ convention = "google"
     "D10",    # Relax docstring requirements in tests
     "ANN",    # Allow missing type hints in tests
 ]
+"adms_wrapper/core/data_processing.py" = [
+    "C901",     # McCabe complexity too high
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+    "PLR0911",  # Too many returns
+]

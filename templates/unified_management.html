@@ -451,7 +451,7 @@
                 <div class="management-section">
                     <div class="section-header">
                         <h3>👥 Employee Management</h3>
-                        <span class="item-count">{{ employees|length }} employees</span>
+                        <span class="item-count"><span id="employee-count">{{ employees|length }}</span> employees</span>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="action" value="employee">
@@ -500,39 +500,73 @@
                         <button type="submit" class="btn">💾 Save Employee</button>
                     </form>
                     
-                    <div class="items-grid">
-                        {% for employee in employees %}
-                        <div class="item-card">
-                            <div class="item-header">
+                    <div style="margin:16px 0; display:flex; gap:10px; align-items:center;">
+                        <input id="employeeSearch" type="text" placeholder="Search by ID, name, branch, or designation..." style="flex:1; padding:10px; border:2px solid #ddd; border-radius:6px;" />
+                        <button type="button" class="btn" id="clearSearchBtn" title="Clear search">✖</button>
+                    </div>
+
+                    <div class="table-container">
+                        <style>
+                            .table-container { overflow-x: auto; background:#fff; border-radius:8px; border:1px solid #e5e7eb; }
+                            table.employee-table { width:100%; border-collapse: collapse; }
+                            table.employee-table th, table.employee-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align:left; }
+                            table.employee-table thead th { background:#f8fafc; color:#334155; font-weight:700; font-size:0.9rem; position: sticky; top: 0; z-index:1; }
+                            table.employee-table tbody tr:hover { background:#f9fbff; }
+                            .col-actions { white-space: nowrap; text-align:right; }
+                            .id-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#eef2ff; color:#3730a3; padding:2px 6px; border-radius:4px; }
+                            .muted { color:#6b7280; }
+                        </style>
+                        <table class="employee-table" id="employeeTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px;">Employee ID</th>
+                                    <th>Name</th>
+                                    <th>Designation</th>
+                                    <th>Branch</th>
+                                    <th>Shift</th>
+                                    <th class="col-actions" style="width:130px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for employee in employees %}
                                 {% set resolved_name = employee.employee_name if employee.employee_name else (employee_id_to_name.get(employee.employee_id|string) if employee_id_to_name is defined else '') %}
-                                <div class="item-title">{{ resolved_name or '—' }} — <small>{{ employee.employee_id }}</small></div>
-                                <div>
-                                    <button type="button" class="edit-btn" 
-                                            onclick='openEditModal({{ employee.employee_id|tojson }}, {{ resolved_name|tojson }}, {{ (employee.designation or '')|tojson }}, {{ (employee.branch_name or '')|tojson }}, {{ (employee.shift_name or '')|tojson }})'>
-                                        ✏️
-                                    </button>
-                                    <form method="POST" style="display: inline;">
-                                        <input type="hidden" name="action" value="employee">
-                                        <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
-                                        <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
-                                    </form>
-                                </div>
-                            </div>
-                            <div class="item-details">
-                                <strong>Name:</strong> {{ employee.employee_name or "Not set" }}<br>
-                                <strong>Designation:</strong> {{ employee.designation or "Not set" }}<br>
-                                <strong>Branch:</strong> {{ employee.branch_name or "Not set" }}<br>
-                                <strong>Shift:</strong> {{ employee.shift_name or "Not set" }}
-                                {% if employee.shift_start and employee.shift_end %}
-                                    ({{ employee.shift_start }} - {{ employee.shift_end }})
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
+                                <tr data-employee-id="{{ employee.employee_id }}">
+                                    <td><span class="id-badge">{{ employee.employee_id }}</span></td>
+                                    <td>{{ resolved_name or '—' }}</td>
+                                    <td>{{ employee.designation or '—' }}</td>
+                                    <td>{{ employee.branch_name or '—' }}</td>
+                                    <td>
+                                        {% if employee.shift_name %}
+                                            {{ employee.shift_name }}
+                                            {% if employee.shift_start and employee.shift_end %}
+                                                <span class="muted">({{ employee.shift_start }} - {{ employee.shift_end }})</span>
+                                            {% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="col-actions">
+                                        <button
+                                            type="button"
+                                            class="edit-btn edit-employee-btn"
+                                            data-employee-id="{{ employee.employee_id }}"
+                                            data-employee-name="{{ resolved_name or '' }}"
+                                            data-designation="{{ employee.designation or '' }}"
+                                            data-branch="{{ employee.branch_name or '' }}"
+                                            data-shift="{{ employee.shift_name or '' }}"
+                                        >✏️ Edit</button>
+                                        <form method="POST" style="display:inline; margin-left:6px;">
+                                            <input type="hidden" name="action" value="employee">
+                                            <input type="hidden" name="delete_employee_id" value="{{ employee.employee_id }}">
+                                            <button type="submit" class="delete-btn" onclick="return confirm('Delete employee {{ employee.employee_id }}?')">🗑️</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                         {% if not employees %}
-                        <div class="empty-state">
-                            No employees found. Add your first employee above!
-                        </div>
+                        <div class="empty-state">No employees found. Add your first employee above!</div>
                         {% endif %}
                     </div>
                 </div>
@@ -822,6 +856,67 @@
     </div>
 
     <script>
+        // Employees table: sort by numeric ID and enable search
+        (function() {
+            const table = document.getElementById('employeeTable');
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Helper to get numeric value from ID cell
+            function parseId(val) {
+                const n = Number(String(val).replace(/[^0-9.-]/g, ''));
+                return Number.isNaN(n) ? null : n;
+            }
+
+            // Initial sort ASC by numeric employee_id; fallback to string
+            rows.sort((a, b) => {
+                const aId = a.getAttribute('data-employee-id') || '';
+                const bId = b.getAttribute('data-employee-id') || '';
+                const aNum = parseId(aId);
+                const bNum = parseId(bId);
+                if (aNum !== null && bNum !== null) return aNum - bNum;
+                return String(aId).localeCompare(String(bId));
+            });
+            rows.forEach(r => tbody.appendChild(r));
+
+            // Search filter
+            const searchInput = document.getElementById('employeeSearch');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            const countEl = document.getElementById('employee-count');
+            function applyFilter() {
+                const q = (searchInput?.value || '').trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(tr => {
+                    if (!q) { tr.style.display = ''; visible++; return; }
+                    const cells = Array.from(tr.children).map(td => td.textContent.toLowerCase());
+                    const hit = cells.some(t => t.includes(q));
+                    tr.style.display = hit ? '' : 'none';
+                    if (hit) visible++;
+                });
+                if (countEl) countEl.textContent = String(visible);
+            }
+            if (searchInput) {
+                searchInput.addEventListener('input', applyFilter);
+            }
+            if (clearBtn && searchInput) {
+                clearBtn.addEventListener('click', () => { searchInput.value = ''; applyFilter(); searchInput.focus(); });
+            }
+            applyFilter();
+
+            // Wire edit buttons via data-* attributes
+            document.querySelectorAll('.edit-employee-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-employee-id') || '';
+                    const name = btn.getAttribute('data-employee-name') || '';
+                    const des = btn.getAttribute('data-designation') || '';
+                    const br = btn.getAttribute('data-branch') || '';
+                    const sh = btn.getAttribute('data-shift') || '';
+                    openEditModal(id, name, des, br, sh);
+                });
+            });
+        })();
+
         function showTab(tabName) {
             // Hide all tab contents
             const tabContents = document.querySelectorAll('.tab-content');
